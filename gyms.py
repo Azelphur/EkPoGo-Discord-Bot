@@ -306,7 +306,7 @@ class Gyms:
         description += "**Going ({})**\n".format(going.count()+num_extra)
 
         description += " | ".join(users)
-        description += "\nPress the {} below if you are going\n[Click here](https://gitlab.home.azelphur.com/snippets/6) to learn how to use this bot".format(self.get_emoji(self.get_config(channel, "emoji_going", u"\U0001F44D")))
+        description += "\nPress the {} below if you are going\n[Click here](https://github.com/Azelphur/EkPoGo-Discord-Bot/wiki/Using-the-bot) more info about this bot".format(self.get_emoji(self.get_config(channel, "emoji_going", u"\U0001F44D")))
         if raid.done:
             embed=discord.Embed(title=title, url="https://www.google.com/maps/?daddr={},{}".format(raid.gym.latitude, raid.gym.longitude), description=description, color=0x00FF00)
         else:
