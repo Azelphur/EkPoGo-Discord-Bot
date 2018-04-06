@@ -576,7 +576,6 @@ class Gyms:
             total_hits += going.count()
         msg = "Since {}, there have been {} raids, {} visits and {} unique visits on {}".format(start_dt, num_raids, total_hits, len(individuals), gym.title)
         await self.bot.say(msg)
-        await self.update_embeds(ctx.message.channel.server, raid)
 
     @commands.command(pass_context=True)
     async def raidgoing(self, ctx, *args):
