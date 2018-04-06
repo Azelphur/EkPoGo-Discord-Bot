@@ -726,6 +726,30 @@ class Gyms:
         await self.add_reactions(msg)
 
     @commands.command(pass_context=True)
+    async def raidhide(self, ctx, raid_id: int, channel: discord.Channel = None):
+        """
+            Hide a raid embed from a channel
+        """
+        raid = self.session.query(Raid).get(raid_id)
+        if raid is None:
+            await self.bot.say("Raid not found")
+            return
+
+        if channel is None:
+            channel = ctx.message.channel
+
+        embeds = self.session.query(Embed).filter_by(raid=raid, channel_id=channel.id)
+        tasks = []
+        for embed in embeds:
+            self.session.query(Embed).filter_by(id=embed.id).delete()
+            tasks.append(self.delete_message(embed))
+        if tasks:
+            self.session.commit()
+            done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            for task in done:
+                task.result() # This will cause errors to be raised correctly.
+
+    @commands.command(pass_context=True)
     async def egg(self, ctx, start_time: str, egg_level: int, * , gym_title: str):
         """
             Create a raid on an egg.
