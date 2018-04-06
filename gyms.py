@@ -576,7 +576,7 @@ class Gyms:
                 total_hits += g.extra
                 extras += g.extra
             total_hits += going.count()
-        msg = "Since {}, there have been {} raids, {} visits and {} - {} unique visits on {}".format(start_dt, num_raids, total_hits, len(individuals)+extras, len(individuals), gym.title)
+        msg = "Since {}, there have been {} raids, {} visits and {} - {} unique visits on {}".format(start_dt, num_raids, total_hits, len(individuals), len(individuals)+extras, gym.title)
         await self.bot.say(msg)
 
     @commands.command(pass_context=True)
