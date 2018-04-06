@@ -567,14 +567,16 @@ class Gyms:
         raids = self.session.query(Raid).filter(Raid.gym==gym, Raid.start_time >= start_dt)
         num_raids = raids.count()
         total_hits = 0
+        extras = 0
         individuals = set()
         for raid in raids:
             going = self.session.query(Going).filter_by(raid=raid)
             for g in going:
                 individuals.add(g.user_id)
                 total_hits += g.extra
+                extras += g.extra
             total_hits += going.count()
-        msg = "Since {}, there have been {} raids, {} visits and {} unique visits on {}".format(start_dt, num_raids, total_hits, len(individuals), gym.title)
+        msg = "Since {}, there have been {} raids, {} visits and {} - {} unique visits on {}".format(start_dt, num_raids, total_hits, len(individuals)+extras, len(individuals), gym.title)
         await self.bot.say(msg)
 
     @commands.command(pass_context=True)
