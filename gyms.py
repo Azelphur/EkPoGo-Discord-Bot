@@ -838,6 +838,20 @@ class Gyms:
         await self.bot.remove_roles(ctx.message.author, role)
         await self.bot.say("I've unsubscribed you to notifications for {}".format(gym.title))
 
+    @commands.command(pass_context=True)
+    @checks.serverowner_or_permissions(administrator=True)
+    async def redo_reactions(self, ctx):
+        start_time = datetime.datetime.now() - datetime.timedelta(days=14)
+        raids = self.session.query(Raid).filter(Raid.start_time >= start_time)
+        for raid in raids:
+            embeds = self.session.query(Embed).filter_by(raid=raid)
+            for embed in embeds:
+                channel = await self.get_channel(embed.channel_id)
+                message = await self.get_message(channel, embed.message_id)
+                await self.bot.clear_reactions(message)
+                await self.add_reactions(message)
+        await self.bot.say("Done")
+
     async def add_reaction(self, msg, emoji):
         match = RE_EMOJI.match(emoji)
         if match:
