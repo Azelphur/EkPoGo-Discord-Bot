@@ -38,7 +38,8 @@ SETTINGS = [
     "emoji_instinct",
     "role_mystic",
     "role_valor",
-    "role_instinct"
+    "role_instinct",
+    "enable_subscriptions",
 ]
 
 RE_DISCORD_MENTION = re.compile("\<@(?:\!|)(\d+)\>")
@@ -264,7 +265,7 @@ class Gyms:
             return self.channel_cache[user_id]
         return self.bot.get_channel(str(channel_id))
 
-    async def prepare_raid_embed(self, channel, raid):
+    async def prepare_raid_embed(self, channel, raid, include_role=False):
         server = channel.server
         if raid.start_time - datetime.datetime.now() > datetime.timedelta(days=1):
             start_time = raid.start_time.strftime("%Y-%m-%d %H:%M")
@@ -315,7 +316,16 @@ class Gyms:
 
         embed.set_thumbnail(url=image)
         embed.set_footer(text="Raid ID {}. Ignore emoji counts, they are inaccurate.".format(raid.id))
-        return embed
+        
+        content = None
+        if include_role and self.get_config(channel, "enable_subscriptions", True):
+            role = None
+            for _role in channel.server.roles:
+                if _role.name == raid.gym.title:
+                    role = _role
+            if role:
+                content = role.mention
+        return embed, content
 
     def prepare_gym_embed(self, gym):
         description = "[Get Directions](https://www.google.com/maps/?daddr={},{})".format(gym.location['lat'], gym.location['lon'])
@@ -695,9 +705,9 @@ class Gyms:
         self.session.add(raid)
         self.session.commit() # Required as we need raids ID in the embed
 
-        embed = await self.prepare_raid_embed(ctx.message.channel, raid)
+        embed, content = await self.prepare_raid_embed(ctx.message.channel, raid, include_role=True)
         tasks = []
-        tasks.append(self.bot.say(embed=embed))
+        tasks.append(self.bot.say(embed=embed, content=content))
         this_channel = ctx.message.channel.id
 
         configs = self.session.query(ChannelConfig).filter_by(server_id=ctx.message.channel.server.id, key="mirror", value="yes")
@@ -705,10 +715,11 @@ class Gyms:
             if config.channel_id == this_channel:
                 continue
             channel = await self.get_channel(config.channel_id)
-            embed = await self.prepare_raid_embed(channel, raid)
+            embed, content = await self.prepare_raid_embed(channel, raid)
             tasks.append(self.bot.send_message(
                 channel,
-                embed=embed))
+                embed=embed,
+                content=content))
 
         done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
         tasks = []
@@ -733,8 +744,8 @@ class Gyms:
             await self.bot.say("Raid not found")
             return
 
-        embed = await self.prepare_raid_embed(ctx.message.channel, raid)
-        msg = await self.bot.say(embed=embed)
+        embed, content = await self.prepare_raid_embed(ctx.message.channel, raid)
+        msg = await self.bot.say(embed=embed, content=content)
         embed = Embed(channel_id=msg.channel.id, message_id=msg.id, raid=raid)
         self.session.add(embed)
         self.session.commit()
@@ -778,6 +789,30 @@ class Gyms:
         """
         await self.start_raid(ctx, start_time, None, pokemon_name, gym_title)
 
+    @commands.command(pass_context=True)
+    async def raidsubscribe(self, ctx, gym_title: str):
+        """
+            Subscribe to notifications on a raid
+        """
+        if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
+            await self.bot.say("This server has raid subscriptions disabled")
+            return
+        if not ctx.message.channel.server.me.server_permissions.manage_roles:
+            await self.bot.say("I do not have permission to create roles on this server")
+            return
+        gym = await self.find_gym(gym_title, ctx.message.channel)
+        if not gym:
+            await self.bot.say("Gym not found.")
+            return
+        role = None
+        for _role in ctx.message.channel.server.roles:
+            if _role.name == gym.title:
+                role = _role
+        if role is None:
+            role = await self.bot.create_role(ctx.message.channel.server, name=gym.title)
+        await self.bot.add_roles(ctx.message.author, role)
+        await self.bot.say("I've subscribed you to notifications for {}".format(gym.title))
+
     async def add_reaction(self, msg, emoji):
         match = RE_EMOJI.match(emoji)
         if match:
@@ -800,8 +835,8 @@ class Gyms:
     async def update_embed(self, embed, raid):
         channel = await self.get_channel(embed.channel_id)
         message = await self.get_message(channel, embed.message_id)
-        discord_embed = await self.prepare_raid_embed(channel, raid)
-        await self.bot.edit_message(message, embed=discord_embed)
+        discord_embed, content = await self.prepare_raid_embed(channel, raid)
+        await self.bot.edit_message(message, embed=discord_embed, content=content)
 
     async def delete_message(self, embed):
         channel = await self.get_channel(embed.channel_id)
@@ -898,10 +933,11 @@ class Gyms:
                     for config in configs:
                         ch = config.channel_id
                         ch_obj = await self.get_channel(ch)
-                        embed = await self.prepare_raid_embed(ch_obj, raid)
+                        embed, content = await self.prepare_raid_embed(ch_obj, raid)
                         tasks.append(self.bot.send_message(
                             ch_obj,
-                            embed=embed))
+                            embed=embed,
+                            content=content))
 
                     if tasks:
                         done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
