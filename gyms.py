@@ -790,7 +790,7 @@ class Gyms:
         await self.start_raid(ctx, start_time, None, pokemon_name, gym_title)
 
     @commands.command(pass_context=True)
-    async def raidsubscribe(self, ctx, gym_title: str):
+    async def raidsubscribe(self, ctx, *, gym_title: str):
         """
             Subscribe to notifications on a gym
         """
