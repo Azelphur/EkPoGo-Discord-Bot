@@ -841,7 +841,7 @@ class Gyms:
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
     async def redo_reactions(self, ctx):
-        from_time = datetime.datetime.now() - datetime.timedelta(days=3)
+        from_time = datetime.datetime.now() - datetime.timedelta(days=14)
         raids = self.session.query(Raid).filter(Raid.start_time >= from_time)
         count = raids.count()
         progress_msg = await self.bot.say("Processing... 0 / {}".format(count))
