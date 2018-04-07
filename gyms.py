@@ -327,7 +327,7 @@ class Gyms:
     @commands.command(pass_context=True)
     async def gym(self, ctx, *, gym_title: str):
         """
-        Lookup a gym, responds with an image, title, description and a google maps link.
+            Lookup a gym, responds with an image, title and a google maps link.
         """
         gym = await self.find_gym(gym_title, ctx.message.channel)
         if not gym:
@@ -356,7 +356,7 @@ class Gyms:
     @checks.is_owner()
     async def loaddata(self, ctx, *, csv_path="gymdata.json"):
         """
-        Load pokemon and gyms from csv file
+            Load pokemon and gyms from json file
         """
         try:
             with open(csv_path, "r") as f:
@@ -411,7 +411,7 @@ class Gyms:
     @checks.is_owner()
     async def gymrm(self, ctx, *, gym_id: int):
         """
-        Delete a gym from the database.
+            Delete a gym from the database.
         """
         try:
             gym = GymDoc.get(id=gym_id)
@@ -424,12 +424,18 @@ class Gyms:
     @commands.command(pass_context=True)
     @checks.is_owner()
     async def gymadd(self, ctx, title: str, latitude: float, longitude: float):
+        """
+            Add a gym to the database
+        """
         gym, gymdoc = self.add_gym(title, latitude, longitude)
         await self.bot.say(embed=self.prepare_gym_embed(gymdoc))
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
     async def raidserverconfig(self, ctx, key: str = None, value: str = None):
+        """
+            Set a server config setting, use `!raidserverconfig` on its own to see a list of settings
+        """
         if key is None:
             await self.bot.say("Valid settings: {}".format(", ".join(SETTINGS)))
             return
@@ -441,11 +447,15 @@ class Gyms:
             await self.bot.say("{} = {}".format(key, self.get_server_config(ctx.message.channel.server.id, key)))
         else:
             self.set_server_config(ctx.message.channel.server.id, key, value)
-            await self.bot.say("Ok")
+            await self.bot.say("Ok, {} = {}".format(key, value))
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
     async def raidchannelconfig(self, ctx, key: str, value: str = None):
+        """
+            Set a channel config setting, these will be chosen in preference to
+            raidserverconfig settings, use `!raidserverconfig` on its own to see a list of settings
+        """
         if key is None:
             await self.bot.say("Valid settings: {}".format(", ".join(SETTINGS)))
             return
@@ -457,7 +467,7 @@ class Gyms:
             await self.bot.say("{} = {}".format(key, self.get_channel_config(ctx.message.channel.server.id, ctx.message.channel.id, key)))
         else:
             self.set_channel_config(ctx.message.channel.server.id, ctx.message.channel.id, key, value)
-            await self.bot.say("Ok")
+            await self.bot.say("Ok, {} = {}".format(key, value))
 
     @commands.command(pass_context=True)
     async def raidstart(self, ctx, raid_id: int, *, start_time: str):
