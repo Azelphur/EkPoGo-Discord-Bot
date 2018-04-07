@@ -44,6 +44,7 @@ SETTINGS = [
 RE_DISCORD_MENTION = re.compile("\<@(?:\!|)(\d+)\>")
 RE_EMOJI = re.compile("\<\:(.+):(\d+)>")
 
+TIME_STRING = "Invalid time specified, please use HH:MM, HHMM, HH.MM, Xm or \"YYYY-MM-DD HH:MM\""
 
 class Gym(Base):
     __tablename__ = 'gym'
@@ -471,7 +472,7 @@ class Gyms:
         start_time = start_time.replace('"', '')
         start_dt = await self.parse_time(start_time)
         if start_dt is None:
-            await self.bot.say("Invalid time specified, please use HH:MM, HHMM, HH.MM or \"YYYY-MM-DD HH:MM\"")
+            await self.bot.say(TIME_STRING)
             return
         raid.start_time = start_dt
         self.session.add(raid)
@@ -644,6 +645,10 @@ class Gyms:
             start_dt = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M")
         except ValueError:
             pass
+
+        if start_dt is None and start_time[-1].lower() == "m" and start_time[:-1].isnumeric():
+            start_dt = datetime.datetime.now() + datetime.timedelta(minutes=int(start_time[:-1]))
+
         return start_dt
 
 
@@ -664,7 +669,7 @@ class Gyms:
         start_dt = await self.parse_time(start_time)
 
         if not start_dt:
-            await self.bot.say("Invalid time specified, please use HH:MM, HHMM, HH.MM or \"YYYY-MM-DD HH:MM\"")
+            await self.bot.say(TIME_STRING)
             return
         
         if pokemon:
