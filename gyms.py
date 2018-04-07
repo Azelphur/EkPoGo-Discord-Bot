@@ -855,13 +855,14 @@ class Gyms:
                     last_time = time.time()
                 channel = await self.get_channel(embed.channel_id)
                 if channel is None:
-                    embed.delete()
+                    self.session.query(Embed).filter_by(id=embed.id).delete()
                 message = await self.get_message(channel, embed.message_id)
                 if message is None:
-                    embed.delete()
+                    self.session.query(Embed).filter_by(id=embed.id).delete()
                 await self.bot.clear_reactions(message)
                 await self.add_reactions(message)
             i = i + 1
+        self.session.commit()
         await self.bot.edit_message(message, "Processing... {} / {}".format(count, count))
         await self.bot.say("Done")
 
