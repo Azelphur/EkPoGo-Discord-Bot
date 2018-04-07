@@ -861,7 +861,7 @@ class Gyms:
         channel = await self.get_channel(embed.channel_id)
         message = await self.get_message(channel, embed.message_id)
         discord_embed, content = await self.prepare_raid_embed(channel, raid)
-        await self.bot.edit_message(message, embed=discord_embed, content=content)
+        await self.bot.edit_message(message, embed=discord_embed)
 
     async def delete_message(self, embed):
         channel = await self.get_channel(embed.channel_id)
