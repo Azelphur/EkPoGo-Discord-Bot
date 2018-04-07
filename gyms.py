@@ -809,7 +809,7 @@ class Gyms:
             if _role.name == gym.title:
                 role = _role
         if role is None:
-            role = await self.bot.create_role(ctx.message.channel.server, name=gym.title)
+            role = await self.bot.create_role(ctx.message.channel.server, name=gym.title, mentionable=True)
         await self.bot.add_roles(ctx.message.author, role)
         await self.bot.say("I've subscribed you to notifications for {}".format(gym.title))
 
