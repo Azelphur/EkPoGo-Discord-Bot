@@ -310,9 +310,9 @@ class Gyms:
         description += " | ".join(users)
         description += "\nPress the {} below if you are going\n[Click here](https://github.com/Azelphur/EkPoGo-Discord-Bot/wiki/Using-the-bot) more info about this bot".format(self.get_emoji(self.get_config(channel, "emoji_going", u"\U0001F44D")))
         if raid.done:
-            embed=discord.Embed(title=title, url="https://www.google.com/maps/?daddr={},{}".format(raid.gym.latitude, raid.gym.longitude), description=description, color=0x00FF00)
+            embed=discord.Embed(title=title, url="https://www.google.com/maps/dir/Current+Location/{},{}".format(raid.gym.latitude, raid.gym.longitude), description=description, color=0x00FF00)
         else:
-            embed=discord.Embed(title=title, url="https://www.google.com/maps/?daddr={},{}".format(raid.gym.latitude, raid.gym.longitude), description=description)
+            embed=discord.Embed(title=title, url="https://www.google.com/maps/dir/Current+Location/{},{}".format(raid.gym.latitude, raid.gym.longitude), description=description)
 
         embed.set_thumbnail(url=image)
         embed.set_footer(text="Raid ID {}. Ignore emoji counts, they are inaccurate.".format(raid.id))
@@ -328,8 +328,8 @@ class Gyms:
         return embed, content
 
     def prepare_gym_embed(self, gym):
-        description = "[Get Directions](https://www.google.com/maps/?daddr={},{})".format(gym.location['lat'], gym.location['lon'])
-        embed=discord.Embed(title=gym.title, url="https://www.google.com/maps/?daddr={},{}".format(gym.location['lat'], gym.location['lon']))
+        description = "[Get Directions](https://www.google.com/maps/dir/Current+Location/{},{})".format(gym.location['lat'], gym.location['lon'])
+        embed=discord.Embed(title=gym.title, url="https://www.google.com/maps/dir/Current+Location/{},{}".format(gym.location['lat'], gym.location['lon']))
         embed.set_image(url='https://maps.googleapis.com/maps/api/staticmap?center={0},{1}&zoom=15&size=250x125&maptype=roadmap&markers=color:{3}%7C{0},{1}&key={2}'.format(gym.location['lat'], gym.location['lon'], 'AIzaSyCEadifeA8X02v2OKv-orZWm8nQf1Q2EZ4', 'red'))
         embed.set_footer(text="Gym ID {}.".format(gym.meta["id"]))
         return embed
