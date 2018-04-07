@@ -854,10 +854,13 @@ class Gyms:
                     await self.bot.edit_message(progress_msg, "Processing... {} / {}".format(i, count))
                     last_time = time.time()
                 channel = await self.get_channel(embed.channel_id)
+                if channel is None:
+                    embed.delete()
                 message = await self.get_message(channel, embed.message_id)
-                if message is not None:
-                    await self.bot.clear_reactions(message)
-                    await self.add_reactions(message)
+                if message is None:
+                    embed.delete()
+                await self.bot.clear_reactions(message)
+                await self.add_reactions(message)
             i = i + 1
         await self.bot.edit_message(message, "Processing... {} / {}".format(count, count))
         await self.bot.say("Done")
