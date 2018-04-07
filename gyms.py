@@ -841,15 +841,24 @@ class Gyms:
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
     async def redo_reactions(self, ctx):
-        start_time = datetime.datetime.now() - datetime.timedelta(days=14)
-        raids = self.session.query(Raid).filter(Raid.start_time >= start_time)
+        from_time = datetime.datetime.now() - datetime.timedelta(days=3)
+        raids = self.session.query(Raid).filter(Raid.start_time >= from_time)
+        count = raids.count()
+        progress_msg = await self.bot.say("Processing... 0 / {}".format(count))
+        last_time = time.time()
+        i = 0
         for raid in raids:
             embeds = self.session.query(Embed).filter_by(raid=raid)
             for embed in embeds:
+                if time.time() - last_time > 10:
+                    await self.bot.edit_message(progress_msg, "Processing... {} / {}".format(i, count))
+                    last_time = time.time()
                 channel = await self.get_channel(embed.channel_id)
                 message = await self.get_message(channel, embed.message_id)
                 await self.bot.clear_reactions(message)
                 await self.add_reactions(message)
+            i = i + 1
+        await self.bot.edit_message(message, "Processing... {} / {}".format(count, count))
         await self.bot.say("Done")
 
     async def add_reaction(self, msg, emoji):
