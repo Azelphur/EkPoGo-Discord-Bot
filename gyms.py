@@ -856,9 +856,11 @@ class Gyms:
                 channel = await self.get_channel(embed.channel_id)
                 if channel is None:
                     self.session.query(Embed).filter_by(id=embed.id).delete()
+                    continue
                 message = await self.get_message(channel, embed.message_id)
                 if message is None:
                     self.session.query(Embed).filter_by(id=embed.id).delete()
+                    continue
                 await self.bot.clear_reactions(message)
                 await self.add_reactions(message)
             i = i + 1
