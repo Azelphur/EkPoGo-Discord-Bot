@@ -792,13 +792,13 @@ class Gyms:
     @commands.command(pass_context=True)
     async def raidsubscribe(self, ctx, gym_title: str):
         """
-            Subscribe to notifications on a raid
+            Subscribe to notifications on a gym
         """
         if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
             await self.bot.say("This server has raid subscriptions disabled")
             return
         if not ctx.message.channel.server.me.server_permissions.manage_roles:
-            await self.bot.say("I do not have permission to create roles on this server")
+            await self.bot.say("I do not have permission to manage roles on this server")
             return
         gym = await self.find_gym(gym_title, ctx.message.channel)
         if not gym:
@@ -812,6 +812,31 @@ class Gyms:
             role = await self.bot.create_role(ctx.message.channel.server, name=gym.title)
         await self.bot.add_roles(ctx.message.author, role)
         await self.bot.say("I've subscribed you to notifications for {}".format(gym.title))
+
+    @commands.command(pass_context=True)
+    async def raidunsubscribe(self, ctx, gym_title: str):
+        """
+            Unsubscribe to notifications on a gym
+        """
+        if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
+            await self.bot.say("This server has raid subscriptions disabled")
+            return
+        if not ctx.message.channel.server.me.server_permissions.manage_roles:
+            await self.bot.say("I do not have permission to manage roles on this server")
+            return
+        gym = await self.find_gym(gym_title, ctx.message.channel)
+        if not gym:
+            await self.bot.say("Gym not found.")
+            return
+        role = None
+        for _role in ctx.message.channel.server.roles:
+            if _role.name == gym.title:
+                role = _role
+        if role is None:
+            await self.bot.say("You are already unsubscribed from this gym")
+            return
+        await self.bot.remove_roles(ctx.message.author, role)
+        await self.bot.say("I've unsubscribed you to notifications for {}".format(gym.title))
 
     async def add_reaction(self, msg, emoji):
         match = RE_EMOJI.match(emoji)
