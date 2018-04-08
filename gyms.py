@@ -147,8 +147,6 @@ class Gyms:
         self.member_cache = {}
         self.channel_cache = {}
 
-        self.emoji = {}
-
         for emoji in self.bot.get_all_emojis():
             self.emoji[emoji.name] = str(emoji)
 
@@ -193,10 +191,14 @@ class Gyms:
         return config
 
     def get_emoji(self, emoji):
-        if self.emoji == {}:
+        match = RE_EMOJI.match(emoji)
+        if match:
             for e in self.bot.get_all_emojis():
-                self.emoji[str(e)] = e
-        return self.emoji.get(emoji, emoji)
+                if str(e) == emoji:
+                    return e
+        if match:
+            return None
+        return emoji
 
     def get_emoji_by_name(self, emoji):
         for e in self.bot.get_all_emojis():
@@ -869,9 +871,7 @@ class Gyms:
         await self.bot.say("Done")
 
     async def add_reaction(self, msg, emoji):
-        match = RE_EMOJI.match(emoji)
-        if match:
-            emoji = self.get_emoji(emoji)
+        emoji = self.get_emoji(emoji)
         await self.bot.add_reaction(msg, emoji)
 
     async def add_reactions(self, msg):
