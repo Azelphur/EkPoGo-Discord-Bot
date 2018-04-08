@@ -838,6 +838,17 @@ class Gyms:
             await self.bot.say("You are already unsubscribed from this gym")
             return
         await self.bot.remove_roles(ctx.message.author, role)
+        delete_role = True
+        await self.bot.request_offline_members(ctx.message.channel.server)
+        for member in ctx.message.channel.server.members:
+            for _role in member.roles:
+                if _role == role:
+                    delete_role = False
+                    break
+            if delete_role is False:
+                break
+        if delete_role:
+            await self.bot.delete_role(ctx.message.channel.server, role)
         await self.bot.say("I've unsubscribed you to notifications for {}".format(gym.title))
 
     @commands.command(pass_context=True)
