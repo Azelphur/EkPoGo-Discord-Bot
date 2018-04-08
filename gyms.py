@@ -907,7 +907,6 @@ class Gyms:
             await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
     async def on_raw_reaction(self, emoji, message_id, channel_id, user_id):
-
         channel = await self.get_channel(channel_id)
         message = await self.get_message(channel, message_id)
         emoji = self.get_emoji_by_name(emoji)
@@ -927,6 +926,15 @@ class Gyms:
             emoji_add_time = self.get_emoji(self.get_config(channel, "emoji_add_time", u"\U000023E9"))
             emoji_remove_time = self.get_emoji(self.get_config(channel, "emoji_remove_time", u"\U000023EA"))
             emoji_done = self.get_emoji(self.get_config(channel, "emoji_done", u"\U00002705"))
+            emojis = [emoji_going, emoji_plus1, emoji_minus1, emoji_add_time, emoji_remove_time, emoji_done]
+            for reaction in message.reactions:
+                try:
+                    emojis.remove(reaction.emoji)
+                except ValueError:
+                    pass
+            if len(emojis) > 0:
+                await self.bot.clear_reactions(message)
+                await self.add_reactions(message)
 
             if emoji == emoji_going:
                 try:
