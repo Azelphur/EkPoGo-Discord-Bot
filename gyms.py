@@ -1,4 +1,5 @@
 import discord
+import geopy.distance
 from .utils import checks
 from discord.ext import commands
 from elasticsearch import Elasticsearch
@@ -22,6 +23,8 @@ Base = declarative_base()
 
 SETTINGS = [
     "mirror",
+    "mirror_nearby",
+    "show_subscriptions",
     "delete_on_done",
     "location",
     "scale",
@@ -147,9 +150,6 @@ class Gyms:
         self.member_cache = {}
         self.channel_cache = {}
 
-        for emoji in self.bot.get_all_emojis():
-            self.emoji[emoji.name] = str(emoji)
-
     def get_server_config(self, server_id, key, default=None):
         try:
             config = self.session.query(ServerConfig).filter_by(server_id=server_id, key=key).one()
@@ -231,13 +231,13 @@ class Gyms:
             location = location.replace(" ", "")
             location = location.split(",")
         if channel is not None and len(location) == 2:
-            scale = self.get_config(channel, "scale", "2km")
+            scale = self.get_config(channel, "scale", "2")
             s = Search(using=self.client, index="marker")
             q = query.Q(
                 "function_score",
                 query=query.Q("match", title={'query': gym, 'fuzziness': 2}),
                 functions=[
-                    query.SF("gauss", location={"origin": {"lat": location[0], "lon": location[1]}, "scale": scale})
+                    query.SF("gauss", location={"origin": {"lat": location[0], "lon": location[1]}, "scale": scale+"km"})
                 ]
             )
             s = s.query(q)
@@ -320,7 +320,9 @@ class Gyms:
         embed.set_footer(text="Raid ID {}. Ignore emoji counts, they are inaccurate.".format(raid.id))
         
         content = None
-        if include_role and self.get_config(channel, "enable_subscriptions", True):
+        if (include_role 
+                and self.get_config(channel, "enable_subscriptions", "yes")
+                and self.get_config(channel, "show_subscriptions", "no")):
             role = None
             for _role in channel.server.roles:
                 if _role.name == raid.gym.title:
@@ -444,7 +446,7 @@ class Gyms:
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
-    async def raidserverconfig(self, ctx, key: str = None, value: str = None):
+    async def raidserverconfig(self, ctx, key: str = None, value: str = None, channel: discord.Channel = None):
         """
             Set a server config setting, use `!raidserverconfig` on its own to see a list of settings
         """
@@ -454,6 +456,8 @@ class Gyms:
         if key not in SETTINGS:
             await self.bot.say("Invalid setting")
             return
+        if channel is None:
+            channel = ctx.message.channel
 
         if value is None:
             await self.bot.say("{} = {}".format(key, self.get_server_config(ctx.message.channel.server.id, key)))
@@ -463,7 +467,7 @@ class Gyms:
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
-    async def raidchannelconfig(self, ctx, key: str, value: str = None):
+    async def raidchannelconfig(self, ctx, key: str, value: str = None, channel: discord.Channel = None):
         """
             Set a channel config setting, these will be chosen in preference to
             raidserverconfig settings, use `!raidserverconfig` on its own to see a list of settings
@@ -474,9 +478,11 @@ class Gyms:
         if key not in SETTINGS:
             await self.bot.say("Invalid setting")
             return
+        if channel is None:
+            channel = ctx.message.channel
 
         if value is None:
-            await self.bot.say("{} = {}".format(key, self.get_channel_config(ctx.message.channel.server.id, ctx.message.channel.id, key)))
+            await self.bot.say("{} = {}".format(key, self.get_channel_config(channel.server.id, channel.id, key)))
         else:
             self.set_channel_config(ctx.message.channel.server.id, ctx.message.channel.id, key, value)
             await self.bot.say("Ok, {} = {}".format(key, value))
@@ -713,16 +719,31 @@ class Gyms:
         this_channel = ctx.message.channel.id
 
         configs = self.session.query(ChannelConfig).filter_by(server_id=ctx.message.channel.server.id, key="mirror", value="yes")
+        channels_to_add_embed = set()
         for config in configs:
             if str(config.channel_id) == this_channel:
                 continue
             channel = await self.get_channel(config.channel_id)
+            channels_to_add_embed.add(channel)
+
+        configs = self.session.query(ChannelConfig).filter_by(server_id=ctx.message.channel.server.id, key="mirror_nearby", value="yes")
+        for config in configs:
+            channel = await self.get_channel(config.channel_id)
+            location = self.get_config(channel, "location", None)
+            if location is None:
+                continue
+            scale = self.get_config(channel, "scale", "2")
+            if geopy.distance.vincenty((gym.latitude, gym.longitude), location).km > int(scale):
+                continue
+            channels_to_add_embed.add(channel)
+
+        for channel in channels_to_add_embed:
             embed, content = await self.prepare_raid_embed(channel, raid)
             tasks.append(self.bot.send_message(
                 channel,
                 embed=embed,
                 content=content))
-
+            
         done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
         tasks = []
         for task in done:
