@@ -714,7 +714,7 @@ class Gyms:
 
         configs = self.session.query(ChannelConfig).filter_by(server_id=ctx.message.channel.server.id, key="mirror", value="yes")
         for config in configs:
-            if config.channel_id == this_channel:
+            if str(config.channel_id) == this_channel:
                 continue
             channel = await self.get_channel(config.channel_id)
             embed, content = await self.prepare_raid_embed(channel, raid)
