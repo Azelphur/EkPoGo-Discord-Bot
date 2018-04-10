@@ -909,7 +909,7 @@ class Gyms:
             return
         poke = await self.find_pokemon(pokemon)
         if not poke:
-            await self.bot.say("Gym not found.")
+            await self.bot.say("Pokemon not found.")
             return
         role = None
         for _role in ctx.message.channel.server.roles:
