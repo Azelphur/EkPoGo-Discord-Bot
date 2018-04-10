@@ -218,7 +218,7 @@ class Gyms:
                 team_emoji = self.get_config(channel, "emoji_valor")
             elif role.name == role_instinct:
                 team_emoji = self.get_config(channel, "emoji_instinct")
-        name = member.nick if member.nick else str(member.name)
+        name = member.display_name
         if team_emoji:
             name = "{} {}".format(team_emoji, name)
         if extra > 0:
@@ -248,8 +248,8 @@ class Gyms:
             return None
         return response[0]
 
-    async def find_pokemon(self, gym):
-        s = Search(using=self.client, index="pokemon").query("match", name={'query': gym, 'fuzziness': 2})
+    async def find_pokemon(self, pokemon):
+        s = Search(using=self.client, index="pokemon").query("match", name={'query': pokemon, 'fuzziness': 2})
         response = s.execute()
         if response.hits.total == 0:
             return None
@@ -871,6 +871,66 @@ class Gyms:
         if delete_role:
             await self.bot.delete_role(ctx.message.channel.server, role)
         await self.bot.say("I've unsubscribed you to notifications for {}".format(gym.title))
+
+    @commands.command(pass_context=True)
+    async def pokemonsubscribe(self, ctx, *, pokemon: str):
+        """
+            Subscribe to notifications on a pokemon
+        """
+        if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
+            await self.bot.say("This server has raid subscriptions disabled")
+            return
+        if not ctx.message.channel.server.me.server_permissions.manage_roles:
+            await self.bot.say("I do not have permission to manage roles on this server")
+            return
+        poke = await self.find_pokemon(pokemon)
+        if not poke:
+            await self.bot.say("Pokemon not found.")
+            return
+        role = None
+        for _role in ctx.message.channel.server.roles:
+            if _role.name == poke.name:
+                role = _role
+        if role is None:
+            role = await self.bot.create_role(ctx.message.channel.server, name=poke.name, mentionable=True)
+        await self.bot.add_roles(ctx.message.author, role)
+        await self.bot.say("I've subscribed you to notifications for {}".format(poke.name))
+
+    @commands.command(pass_context=True)
+    async def pokemonunsubscribe(self, ctx, pokemon: str):
+        """
+            Unsubscribe to notifications on a pokemon
+        """
+        if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
+            await self.bot.say("This server has raid subscriptions disabled")
+            return
+        if not ctx.message.channel.server.me.server_permissions.manage_roles:
+            await self.bot.say("I do not have permission to manage roles on this server")
+            return
+        poke = await self.find_pokemon(pokemon)
+        if not poke:
+            await self.bot.say("Gym not found.")
+            return
+        role = None
+        for _role in ctx.message.channel.server.roles:
+            if _role.name == poke.name:
+                role = _role
+        if role is None:
+            await self.bot.say("You are already unsubscribed from this pokemon")
+            return
+        await self.bot.remove_roles(ctx.message.author, role)
+        delete_role = True
+        await self.bot.request_offline_members(ctx.message.channel.server)
+        for member in ctx.message.channel.server.members:
+            for _role in member.roles:
+                if _role == role:
+                    delete_role = False
+                    break
+            if delete_role is False:
+                break
+        if delete_role:
+            await self.bot.delete_role(ctx.message.channel.server, role)
+        await self.bot.say("I've unsubscribed you to notifications for {}".format(poke.name))
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
