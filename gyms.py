@@ -298,6 +298,8 @@ class Gyms:
             for task in done:
                 result = task.result()
                 users.append(result)
+            users.sort()
+
         if raid.pokemon is None:
             description = "**Level**: {}\n".format(raid.level)
             image = "https://www.trainerdex.co.uk/egg/{}.png".format(raid.level)
