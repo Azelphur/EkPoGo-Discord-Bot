@@ -43,6 +43,7 @@ SETTINGS = [
     "role_valor",
     "role_instinct",
     "enable_subscriptions",
+    "log",
 ]
 
 RE_DISCORD_MENTION = re.compile("\<@(?:\!|)(\d+)\>")
@@ -502,6 +503,7 @@ class Gyms:
         if start_dt is None:
             await self.bot.say(TIME_STRING)
             return
+        await self.log(ctx.message.channel.server, "{} changed start on raid {} from {} to {}", ctx.message.author, raid_id, raid.start_time, start_dt)
         raid.start_time = start_dt
         self.session.add(raid)
         self.session.commit()
@@ -523,6 +525,7 @@ class Gyms:
             await self.bot.say("Pokemon not found.")
             return
         pokemon = self.session.query(Pokemon).get(pokemon.meta['id'])
+        await self.log(ctx.message.channel.server, "{} changed pokemon on raid {} from {} to {}", ctx.message.author, raid_id, raid.pokemon.name, pokemon.name)
         raid.pokemon = pokemon
 
         self.session.add(raid)
@@ -567,11 +570,13 @@ class Gyms:
             return
 
         gym = self.session.query(Gym).get(gym.meta['id'])
+        await self.log(ctx.message.channel.server, "{} changed gym on raid {} from {} to {}", ctx.message.author, raid_id, raid.gym.title, gym.title)
         raid.gym = gym
         self.session.add(raid)
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
         await self.update_embeds(ctx.message.channel.server, raid)
+
 
     @commands.command(pass_context=True)
     async def raidstats(self, ctx, since: str, *, gym_title: str):
@@ -652,6 +657,7 @@ class Gyms:
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
         await self.update_embeds(ctx.message.channel.server, raid)
+        await self.log(ctx.message.channel.server, "{} added {} as going to raid {}", ctx.message.author, ", ".join([await self.get_display_name(ctx.message.channel, member, extra) for member, extra in members]), raid.id)
 
     async def parse_time(self, start_time):
         start_dt = None
@@ -756,6 +762,8 @@ class Gyms:
         for task in done:
             task.result() # This will cause errors to be raised correctly.
         self.session.commit()
+        await self.log(ctx.message.channel.server, "{} created raid {}", ctx.message.author, raid.id)
+
 
     @commands.command(pass_context=True)
     async def raidmirror(self, ctx, raid_id: int):
@@ -975,6 +983,7 @@ class Gyms:
     async def on_raw_reaction(self, emoji, message_id, channel_id, user_id):
         channel = await self.get_channel(channel_id)
         message = await self.get_message(channel, message_id)
+        member = await self.get_member(channel.server, user_id)
         emoji = self.get_emoji_by_name(emoji)
 
         if message.author == self.bot.user and user_id != self.bot.user.id:
@@ -1006,9 +1015,11 @@ class Gyms:
                 try:
                     going = self.session.query(Going).filter_by(raid=embed.raid, user_id=user_id).one()
                     self.session.query(Going).filter_by(raid=embed.raid, user_id=user_id).delete()
+                    await self.log(channel.server, "{} marked themself as not going to raid {}", member, embed.raid.id)
                 except NoResultFound:
                     going = Going(raid=embed.raid, user_id=user_id, extra=0)
                     self.session.add(going)
+                    await self.log(channel.server, "{} marked themself as going to raid {}", member, embed.raid.id)
                 self.session.commit()
 
                 await self.update_embeds(channel.server, embed.raid)
@@ -1019,15 +1030,19 @@ class Gyms:
                     return
                 if emoji == emoji_plus1:
                     going.extra = going.extra + 1
+                    await self.log(channel.server, "{} added a +1 (now {}) on raid {}", member, going.extra, embed.raid.id)
                 elif going.extra == 0:
                     return
                 else:
                     going.extra = going.extra - 1
+                    await self.log(channel.server, "{} removed a +1 (now {}) on raid {}", member, going.extra, embed.raid.id)
                 self.session.add(going)
                 self.session.commit()
                 await self.update_embeds(channel.server, embed.raid)
+
             elif emoji in [emoji_add_time, emoji_remove_time]:
                 raid = embed.raid
+                old_start_time = raid.start_time
                 if emoji == emoji_add_time:
                     raid.start_time += datetime.timedelta(minutes=int(self.get_config(channel, "edit_time", 5)))
                 else:
@@ -1035,6 +1050,7 @@ class Gyms:
                 self.session.add(raid)
                 self.session.commit()
                 await self.update_embeds(channel.server, embed.raid)
+                await self.log(channel.server, "{} changed start on raid {} from {} to {}", member, raid.id, old_start_time, raid.start_time)
             elif emoji == emoji_done:
                 raid = embed.raid
                 raid.done = not raid.done
@@ -1055,6 +1071,7 @@ class Gyms:
                         for task in done:
                             task.result() # This will cause errors to be raised correctly.
                     await self.update_embeds(channel.server, raid)
+                    await self.log(channel.server, "{} marked raid {} as done", member, raid.id)
                 else:
                     await self.update_embeds(channel.server, raid)
                     tasks = []
@@ -1081,7 +1098,7 @@ class Gyms:
                         for task in done:
                             task.result() # This will cause errors to be raised correctly.
                     self.session.commit()
-
+                    await self.log(channel.server, "{} marked raid {} not as done", member, raid.id)
 
     async def on_raw_message_delete(self, channel_id, message_id):
         try:
@@ -1125,6 +1142,13 @@ class Gyms:
                 response['d']['channel_id'],
                 response['d']['id']
             )
+
+    async def log(self, server, message, *args):
+        configs = self.session.query(ChannelConfig).filter_by(server_id=server.id, key="log", value="yes")
+        for config in configs:
+            channel = await self.get_channel(config.channel_id)
+            await self.bot.send_message(channel, content=message.format(*args))
+        
 
 def setup(bot):
     bot.add_cog(Gyms(bot))
