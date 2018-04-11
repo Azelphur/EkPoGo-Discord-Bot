@@ -812,51 +812,41 @@ class Gyms:
         """
         await self.start_raid(ctx, start_time, None, pokemon_name, gym_title)
 
-    @commands.command(pass_context=True)
-    async def raidsubscribe(self, ctx, *, gym_title: str):
-        """
-            Subscribe to notifications on a gym
-        """
+    async def subscription_checks(self, ctx):
         if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
             await self.bot.say("This server has raid subscriptions disabled")
-            return
+            return False
         if not ctx.message.channel.server.me.server_permissions.manage_roles:
             await self.bot.say("I do not have permission to manage roles on this server")
-            return
-        gym = await self.find_gym(gym_title, ctx.message.channel)
-        if not gym:
-            await self.bot.say("Gym not found.")
-            return
-        role = None
-        for _role in ctx.message.channel.server.roles:
-            if _role.name == gym.title:
-                role = _role
-        if role is None:
-            role = await self.bot.create_role(ctx.message.channel.server, name=gym.title, mentionable=True)
-        await self.bot.add_roles(ctx.message.author, role)
-        await self.bot.say("I've subscribed you to notifications for {}".format(gym.title))
+            return False
+        return True
 
-    @commands.command(pass_context=True)
-    async def raidunsubscribe(self, ctx, gym_title: str):
-        """
-            Unsubscribe to notifications on a gym
-        """
-        if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
-            await self.bot.say("This server has raid subscriptions disabled")
-            return
-        if not ctx.message.channel.server.me.server_permissions.manage_roles:
-            await self.bot.say("I do not have permission to manage roles on this server")
-            return
-        gym = await self.find_gym(gym_title, ctx.message.channel)
-        if not gym:
-            await self.bot.say("Gym not found.")
-            return
+    async def find_role(self, server, role_name):
         role = None
-        for _role in ctx.message.channel.server.roles:
-            if _role.name == gym.title:
+        for _role in server.roles:
+            if _role.name == role_name:
                 role = _role
+        return role
+
+    async def get_or_create_role(self, server, role_name):
+        role = await self.find_role(server, role_name)
         if role is None:
-            await self.bot.say("You are already unsubscribed from this gym")
+            role = await self.bot.create_role(server, name=role_name, mentionable=True)
+        return role
+
+    async def subscribe(self, ctx, role_name):
+        if not await self.subscription_checks(ctx):
+            return
+        role = await self.get_or_create_role(ctx.message.channel.server, role_name)
+        await self.bot.add_roles(ctx.message.author, role)
+        await self.bot.say("I've subscribed you to notifications for {}".format(role_name))
+
+    async def unsubscribe(self, ctx, role_name):
+        if not await self.subscription_checks(ctx):
+            return
+        role = await self.find_role(ctx.message.channel.server, role_name)
+        if role is None:
+            await self.bot.say("You are not subscribed to that role")
             return
         await self.bot.remove_roles(ctx.message.author, role)
         delete_role = True
@@ -870,7 +860,51 @@ class Gyms:
                 break
         if delete_role:
             await self.bot.delete_role(ctx.message.channel.server, role)
-        await self.bot.say("I've unsubscribed you to notifications for {}".format(gym.title))
+        await self.bot.say("I've unsubscribed you to notifications for {}".format(role_name))
+
+    @commands.command(pass_context=True)
+    async def raidsubscribe(self, ctx, *, gym_title: str):
+        """
+            Subscribe to notifications on a gym
+        """
+        gym = await self.find_gym(gym_title, ctx.message.channel)
+        if not gym:
+            await self.bot.say("Gym not found.")
+            return
+        await self.subscribe(ctx, gym.title)
+
+    @commands.command(pass_context=True)
+    async def raidunsubscribe(self, ctx, gym_title: str):
+        """
+            Unsubscribe to notifications on a gym
+        """
+        gym = await self.find_gym(gym_title, ctx.message.channel)
+        if not gym:
+            await self.bot.say("Gym not found.")
+            return
+        await self.unsubscribe(ctx, gym.title)
+
+    @commands.command(pass_context=True)
+    async def pokemonsubscribe(self, ctx, *, pokemon: str):
+        """
+            Subscribe to notifications on a pokemon
+        """
+        p = await self.find_pokemon(pokemon)
+        if not p:
+            await self.bot.say("Pokemon not found.")
+            return
+        await self.subscribe(ctx, p.name)
+
+    @commands.command(pass_context=True)
+    async def pokemonunsubscribe(self, ctx, pokemon: str):
+        """
+            Unsubscribe to notifications on a pokemon
+        """
+        p = await self.find_pokemon(pokemon)
+        if not p:
+            await self.bot.say("Pokemon not found.")
+            return
+        await self.unsubscribe(ctx, p.name)
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
