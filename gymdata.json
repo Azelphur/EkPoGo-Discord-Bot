@@ -3,7 +3,8 @@
         "type": "pokemon",
         "data": {
             "name": "Bulbasaur",
-            "id": "001"
+            "id": "001",
+            "raid_level": 1
         }
     },
     {
@@ -24,7 +25,8 @@
         "type": "pokemon",
         "data": {
             "name": "Charmander",
-            "id": "004"
+            "id": "004",
+            "raid_level": 1
         }
     },
     {
@@ -45,7 +47,8 @@
         "type": "pokemon",
         "data": {
             "name": "Squirtle",
-            "id": "007"
+            "id": "007",
+            "raid_level": 1
         }
     },
     {
@@ -339,7 +342,8 @@
         "type": "pokemon",
         "data": {
             "name": "Venomoth",
-            "id": "049"
+            "id": "049",
+            "raid_level": 2
         }
     },
     {
@@ -451,7 +455,8 @@
         "type": "pokemon",
         "data": {
             "name": "Alakazam",
-            "id": "065"
+            "id": "065",
+            "raid_level": 3
         }
     },
     {
@@ -529,7 +534,8 @@
         "type": "pokemon",
         "data": {
             "name": "Golem",
-            "id": "076"
+            "id": "076",
+            "raid_level": 4
         }
     },
     {
@@ -620,7 +626,8 @@
         "type": "pokemon",
         "data": {
             "name": "Muk",
-            "id": "089"
+            "id": "089",
+            "raid_level": 2
         }
     },
     {
@@ -663,7 +670,8 @@
         "type": "pokemon",
         "data": {
             "name": "Onix",
-            "id": "095"
+            "id": "095",
+            "raid_level": 3
         }
     },
     {
@@ -755,7 +763,8 @@
         "type": "pokemon",
         "data": {
             "name": "Lickitung",
-            "id": "108"
+            "id": "108",
+            "raid_level": 2
         }
     },
     {
@@ -769,7 +778,8 @@
         "type": "pokemon",
         "data": {
             "name": "Weezing",
-            "id": "110"
+            "id": "110",
+            "raid_level": 2
         }
     },
     {
@@ -783,7 +793,8 @@
         "type": "pokemon",
         "data": {
             "name": "Rhydon",
-            "id": "112"
+            "id": "112",
+            "raid_level": 4
         }
     },
     {
@@ -860,7 +871,8 @@
         "type": "pokemon",
         "data": {
             "name": "Scyther",
-            "id": "123"
+            "id": "123",
+            "raid_level": 3
         }
     },
     {
@@ -919,7 +931,8 @@
         "type": "pokemon",
         "data": {
             "name": "Lapras",
-            "id": "131"
+            "id": "131",
+            "raid_level": 4
         }
     },
     {
@@ -975,7 +988,8 @@
         "type": "pokemon",
         "data": {
             "name": "Omastar",
-            "id": "139"
+            "id": "139",
+            "raid_level": 3
         }
     },
     {
@@ -989,42 +1003,48 @@
         "type": "pokemon",
         "data": {
             "name": "Kabutops",
-            "id": "141"
+            "id": "141",
+            "raid_level": 3
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Aerodactyl",
-            "id": "142"
+            "id": "142",
+            "raid_level": 3
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Snorlax",
-            "id": "143"
+            "id": "143",
+            "raid_level": 4
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Articuno",
-            "id": "144"
+            "id": "144",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Zapdos",
-            "id": "145"
+            "id": "145",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Moltres",
-            "id": "146"
+            "id": "146",
+            "raid_level": 5
         }
     },
     {
@@ -1709,21 +1729,24 @@
         "type": "pokemon",
         "data": {
             "name": "Raikou",
-            "id": "243"
+            "id": "243",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Entei",
-            "id": "244"
+            "id": "244",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Suicune",
-            "id": "245"
+            "id": "245",
+            "raid_level": 5
         }
     },
     {
@@ -1752,14 +1775,16 @@
         "type": "pokemon",
         "data": {
             "name": "Lugia",
-            "id": "249"
+            "id": "249",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Ho-Oh",
-            "id": "250"
+            "id": "250",
+            "raid_level": 5
         }
     },
     {
@@ -2694,21 +2719,24 @@
         "type": "pokemon",
         "data": {
             "name": "Kyogre",
-            "id": "382"
+            "id": "382",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Groudon",
-            "id": "383"
+            "id": "383",
+            "raid_level": 5
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Rayquaza",
-            "id": "384"
+            "id": "384",
+            "raid_level": 5
         }
     },
     {
