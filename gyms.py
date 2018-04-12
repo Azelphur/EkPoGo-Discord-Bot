@@ -854,7 +854,7 @@ class Gyms:
             return
         role = await self.find_role(ctx.message.channel.server, role_name)
         if role is None:
-            await self.bot.say("You are not subscribed to that role")
+            await self.bot.say("You are not subscribed to {}".format(role_name))
             return
         await self.bot.remove_roles(ctx.message.author, role)
         delete_role = True
@@ -882,7 +882,7 @@ class Gyms:
         await self.subscribe(ctx, gym.title)
 
     @commands.command(pass_context=True)
-    async def raidunsubscribe(self, ctx, gym_title: str):
+    async def raidunsubscribe(self, ctx, *, gym_title: str):
         """
             Unsubscribe to notifications on a gym
         """
@@ -904,7 +904,7 @@ class Gyms:
         await self.subscribe(ctx, p.name)
 
     @commands.command(pass_context=True)
-    async def pokemonunsubscribe(self, ctx, pokemon: str):
+    async def pokemonunsubscribe(self, ctx, *, pokemon: str):
         """
             Unsubscribe to notifications on a pokemon
         """
