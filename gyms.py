@@ -298,6 +298,8 @@ class Gyms:
             for task in done:
                 result = task.result()
                 users.append(result)
+            users.sort()
+
         if raid.pokemon is None:
             description = "**Level**: {}\n".format(raid.level)
             image = "https://www.trainerdex.co.uk/egg/{}.png".format(raid.level)
@@ -525,7 +527,10 @@ class Gyms:
             await self.bot.say("Pokemon not found.")
             return
         pokemon = self.session.query(Pokemon).get(pokemon.meta['id'])
-        await self.log(ctx.message.channel.server, "{} changed pokemon on raid {} from {} to {}", ctx.message.author, raid_id, raid.pokemon.name, pokemon.name)
+        if raid.pokemon:
+            await self.log(ctx.message.channel.server, "{} changed pokemon on raid {} from {} to {}", ctx.message.author, raid_id, raid.pokemon.name, pokemon.name)
+        else:
+            await self.log(ctx.message.channel.server, "{} set pokemon on raid {} to {}", ctx.message.author, raid_id, pokemon.name)
         raid.pokemon = pokemon
 
         self.session.add(raid)
