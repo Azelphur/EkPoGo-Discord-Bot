@@ -664,6 +664,23 @@ class Gyms:
         await self.update_embeds(ctx.message.channel.server, raid)
         await self.log(ctx.message.channel.server, "{} added {} as going to raid {}", ctx.message.author, ", ".join([await self.get_display_name(ctx.message.channel, member, extra) for member, extra in members]), raid.id)
 
+    @commands.command(pass_context=True)
+    async def raidnotgoing(self, ctx, raid_id: int, *members: discord.Member):
+        """
+            Mark users as not going to a raid.
+        """
+        raid = self.session.query(Raid).get(raid_id)
+        if raid is None:
+            await self.bot.say("Raid not found")
+            return
+
+        for member in members:
+            self.session.query(Going).filter_by(raid=raid, user_id=member.id).delete()
+
+        await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
+        await self.update_embeds(ctx.message.channel.server, raid)
+        await self.log(ctx.message.channel.server, "{} removed {} from raid {}", ctx.message.author, ", ".join([await self.get_display_name(ctx.message.channel, member) for member in members]), raid.id)
+
     async def parse_time(self, start_time):
         start_dt = None
         for t_format in ["%H:%M", "%H%M", "%H.%M"]:
