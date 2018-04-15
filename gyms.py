@@ -499,6 +499,28 @@ class Gyms:
             await self.bot.say("Ok, {} = {}".format(key, value))
 
     @commands.command(pass_context=True)
+    async def raidstart(self, ctx, raid_id: int, *, start_time: str):
+        """
+            Alter the start time on a raid. Start time must be
+            HH:MM, HHMM, HH.MM or \"YYYY-MM-DD HH:MM\"
+        """
+        raid = self.session.query(Raid).get(raid_id)
+        if raid is None:
+            await self.bot.say("Raid not found")
+            return
+        start_time = start_time.replace('"', '')
+        start_dt = await self.parse_time(start_time)
+        if start_dt is None:
+            await self.bot.say(TIME_STRING)
+            return
+        await self.log(ctx.message.channel.server, "{} changed start on raid {} from {} to {}", ctx.message.author, raid_id, raid.start_time, start_dt)
+        raid.start_time = start_dt
+        self.session.add(raid)
+        self.session.commit()
+        await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
+        await self.update_embeds(ctx.message.channel.server, raid)
+
+    @commands.command(pass_context=True)
     async def raidend(self, ctx, raid_id: int, *, end_time: str):
         """
             Alter the end time on a raid. End time must be
