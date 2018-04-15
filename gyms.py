@@ -51,6 +51,9 @@ RE_EMOJI = re.compile("\<\:(.+):(\d+)>")
 
 TIME_STRING = "Invalid time specified, please use HH:MM, HHMM, HH.MM, Xm or \"YYYY-MM-DD HH:MM\""
 
+HATCH_TIME = datetime.timedelta(minutes=60)
+DESPAWN_TIME = datetime.timedelta(minutes=45)
+
 class Gym(Base):
     __tablename__ = 'gym'
     id = Column(Integer, primary_key=True)
@@ -73,6 +76,7 @@ class Raid(Base):
     pokemon = relationship(Pokemon, foreign_keys=[pokemon_id])
     gym_id = Column(Integer, ForeignKey("gym.id"))
     gym = relationship(Gym, foreign_keys=[gym_id])
+    end_time = Column(DateTime)
     start_time = Column(DateTime)
     level = Column(Integer, nullable=True)
     done = Column(Boolean, default=False)
@@ -268,12 +272,13 @@ class Gyms:
             return self.channel_cache[user_id]
         return self.bot.get_channel(str(channel_id))
 
+    def format_time(self, t):
+        if t - datetime.datetime.now() > datetime.timedelta(days=1):
+            return t.strftime("%Y-%m-%d %H:%M")
+        return t.strftime("%H:%M")
+
     async def prepare_raid_embed(self, channel, raid, include_role=False):
         server = channel.server
-        if raid.start_time - datetime.datetime.now() > datetime.timedelta(days=1):
-            start_time = raid.start_time.strftime("%Y-%m-%d %H:%M")
-        else:
-            start_time = raid.start_time.strftime("%H:%M")
         title = "{} (#{})".format(raid.gym.title, raid.id)
         going = self.session.query(Going).filter_by(raid=raid)
 
@@ -309,7 +314,10 @@ class Gyms:
                 description = "**Pokemon**: {} (Level {})\n".format(raid.pokemon.name, raid.pokemon.raid_level)
             else:
                 description = "**Pokemon**: {}\n".format(raid.pokemon.name, raid.pokemon.raid_level)
-        description += "**Start Time**: {}\n".format(start_time)
+        description += "**Start Time**: {}\n".format(self.format_time(raid.start_time))
+        if datetime.datetime.now() < raid.end_time - DESPAWN_TIME:
+            description += "**Hatches at**: {}\n".format(self.format_time(raid.end_time - DESPAWN_TIME))
+        description += "**Despawns at**: {}\n".format(self.format_time(raid.end_time))
         description += "**Going ({})**\n".format(going.count()+num_extra)
 
         description += " | ".join(users)
@@ -491,22 +499,22 @@ class Gyms:
             await self.bot.say("Ok, {} = {}".format(key, value))
 
     @commands.command(pass_context=True)
-    async def raidstart(self, ctx, raid_id: int, *, start_time: str):
+    async def raidend(self, ctx, raid_id: int, *, end_time: str):
         """
-            Alter the start time on a raid. Start time must be
+            Alter the end time on a raid. End time must be
             HH:MM, HHMM, HH.MM or \"YYYY-MM-DD HH:MM\"
         """
         raid = self.session.query(Raid).get(raid_id)
         if raid is None:
             await self.bot.say("Raid not found")
             return
-        start_time = start_time.replace('"', '')
-        start_dt = await self.parse_time(start_time)
-        if start_dt is None:
+        end_time = end_time.replace('"', '')
+        end_dt = await self.parse_time(end_time)
+        if end_dt is None:
             await self.bot.say(TIME_STRING)
             return
-        await self.log(ctx.message.channel.server, "{} changed start on raid {} from {} to {}", ctx.message.author, raid_id, raid.start_time, start_dt)
-        raid.start_time = start_dt
+        await self.log(ctx.message.channel.server, "{} changed end on raid {} from {} to {}", ctx.message.author, raid_id, raid.end_time, end_dt)
+        raid.end_time = end_dt
         self.session.add(raid)
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
@@ -522,16 +530,20 @@ class Gyms:
             await self.bot.say("Raid not found")
             return
 
-        pokemon = await self.find_pokemon(pokemon_name)
-        if not pokemon:
-            await self.bot.say("Pokemon not found.")
-            return
-        pokemon = self.session.query(Pokemon).get(pokemon.meta['id'])
-        if raid.pokemon:
-            await self.log(ctx.message.channel.server, "{} changed pokemon on raid {} from {} to {}", ctx.message.author, raid_id, raid.pokemon.name, pokemon.name)
+        if pokemon_name.isnumeric():
+            raid.pokemon = None
+            raid.level = int(pokemon_name)
         else:
-            await self.log(ctx.message.channel.server, "{} set pokemon on raid {} to {}", ctx.message.author, raid_id, pokemon.name)
-        raid.pokemon = pokemon
+            pokemon = await self.find_pokemon(pokemon_name)
+            if not pokemon:
+                await self.bot.say("Pokemon not found.")
+                return
+            pokemon = self.session.query(Pokemon).get(pokemon.meta['id'])
+            if raid.pokemon:
+                await self.log(ctx.message.channel.server, "{} changed pokemon on raid {} from {} to {}", ctx.message.author, raid_id, raid.pokemon.name, pokemon.name)
+            else:
+                await self.log(ctx.message.channel.server, "{} set pokemon on raid {} to {}", ctx.message.author, raid_id, pokemon.name)
+            raid.pokemon = pokemon
 
         self.session.add(raid)
         self.session.commit()
@@ -683,6 +695,12 @@ class Gyms:
 
     async def parse_time(self, start_time):
         start_dt = None
+
+        cleaned_start_time = start_time.rstrip("m")
+        cleaned_start_time = cleaned_start_time.rstrip("mins")
+        if cleaned_start_time.isnumeric():
+            return datetime.datetime.now() + datetime.timedelta(minutes=int(cleaned_start_time))
+
         for t_format in ["%H:%M", "%H%M", "%H.%M"]:
             try:
                 now = datetime.datetime.now()
@@ -702,41 +720,45 @@ class Gyms:
         except ValueError:
             pass
 
-        if start_dt is None and start_time[-1].lower() == "m" and start_time[:-1].isnumeric():
-            start_dt = datetime.datetime.now() + datetime.timedelta(minutes=int(start_time[:-1]))
-
         return start_dt
 
 
-    async def start_raid(self, ctx, start_time, egg_level, pokemon_name, gym_title):
+    async def start_raid(self, ctx, end_time, pokemon_name, gym_title):
         gym = await self.find_gym(gym_title, ctx.message.channel)
         if not gym:
             await self.bot.say("Gym not found.")
             return
 
-        if pokemon_name is None:
+        end_dt = await self.parse_time(end_time)
+
+        if not end_dt:
+            await self.bot.say(TIME_STRING)
+            return
+        if pokemon_name.isnumeric():
             pokemon = None
+            level = int(pokemon_name)
+            start_dt = end_dt # Start time is set to hatch time by default
+            end_dt += DESPAWN_TIME
         else:
             pokemon = await self.find_pokemon(pokemon_name)
             if not pokemon:
                 await self.bot.say("Pokemon not found.")
                 return
-
-        start_dt = await self.parse_time(start_time)
-
-        if not start_dt:
-            await self.bot.say(TIME_STRING)
-            return
-        
-        if pokemon:
+            start_dt = datetime.datetime.now() + datetime.timedelta(minutes=10)
+            if start_dt > end_dt: # Have we selected a start time after the raid ends? fix it
+                start_dt = end_dt - datetime.timedelta(minutes=2)
+            if start_dt < end_dt - DESPAWN_TIME: # Have we selected a start time before the raid hatches? fix it
+                start_dt = end_dt - DESPAWN_TIME
             pokemon = self.session.query(Pokemon).get(pokemon.meta['id'])
+            level = pokemon.raid_level
 
         gym = self.session.query(Gym).get(gym.meta['id'])
         raid = Raid(
             pokemon=pokemon,
             gym=gym,
+            end_time=end_dt,
             start_time=start_dt,
-            level=egg_level
+            level=level
         )
         self.session.add(raid)
         self.session.commit() # Required as we need raids ID in the embed
@@ -756,6 +778,8 @@ class Gyms:
 
         configs = self.session.query(ChannelConfig).filter_by(server_id=ctx.message.channel.server.id, key="mirror_nearby", value="yes")
         for config in configs:
+            if str(config.channel_id) == this_channel:
+                continue
             channel = await self.get_channel(config.channel_id)
             location = self.get_config(channel, "location", None)
             if location is None:
@@ -829,18 +853,11 @@ class Gyms:
                 task.result() # This will cause errors to be raised correctly.
 
     @commands.command(pass_context=True)
-    async def egg(self, ctx, start_time: str, egg_level: int, * , gym_title: str):
-        """
-            Create a raid on an egg.
-        """
-        await self.start_raid(ctx, start_time, egg_level, None, gym_title)
-
-    @commands.command(pass_context=True)
-    async def raid(self, ctx, start_time: str, pokemon_name: str, *, gym_title: str):
+    async def raid(self, ctx, time_remaining: str, pokemon_name: str, *, gym_title: str):
         """
             Create a raid on a pokemon.
         """
-        await self.start_raid(ctx, start_time, None, pokemon_name, gym_title)
+        await self.start_raid(ctx, time_remaining, pokemon_name, gym_title)
 
     async def subscription_checks(self, ctx):
         if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
