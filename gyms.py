@@ -141,7 +141,6 @@ def format_list(items):
         message = "{0}".format(items[0])
     return message
 
-
 class Gyms:
     """Information about gyms, and raid enrollment."""
 
@@ -670,18 +669,8 @@ class Gyms:
                 await self.bot.say("```!raidgoing <raid_id> <member> [extra=0] [<member> [extra=0]...]\n\nAdd users as going to a raid```")
                 return
 
-        for member, extra in members:
-            try:
-                going = self.session.query(Going).filter_by(raid=raid, user_id=member.id).one()
-            except NoResultFound:
-                going = Going(raid=raid, user_id=member.id)
-            going.extra = extra
-            self.session.add(going)
-
-        self.session.commit()
+        await self.mark_going(ctx.message.channel, ctx.message.author, members, raid, extra)
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
-        await self.update_embeds(ctx.message.channel.server, raid)
-        await self.log(ctx.message.channel.server, "{} added {} as going to raid {}", ctx.message.author, ", ".join([await self.get_display_name(ctx.message.channel, member, extra) for member, extra in members]), raid.id)
 
     @commands.command(pass_context=True)
     async def raidnotgoing(self, ctx, raid_id: int, *members: discord.Member):
@@ -697,8 +686,6 @@ class Gyms:
             self.session.query(Going).filter_by(raid=raid, user_id=member.id).delete()
 
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
-        await self.update_embeds(ctx.message.channel.server, raid)
-        await self.log(ctx.message.channel.server, "{} removed {} from raid {}", ctx.message.author, ", ".join([await self.get_display_name(ctx.message.channel, member) for member in members]), raid.id)
 
     async def parse_time(self, start_time):
         start_dt = None
@@ -866,12 +853,14 @@ class Gyms:
         """
         await self.start_raid(ctx, time_remaining, pokemon_name, gym_title)
 
-    async def subscription_checks(self, ctx):
-        if not self.get_config(ctx.message.channel, "enable_subscriptions", True):
-            await self.bot.say("This server has raid subscriptions disabled")
+    async def subscription_checks(self, channel, silent=False):
+        if not self.get_config(channel, "enable_subscriptions", True):
+            if not silent:
+                await self.bot.say("This server has raid subscriptions disabled")
             return False
-        if not ctx.message.channel.server.me.server_permissions.manage_roles:
-            await self.bot.say("I do not have permission to manage roles on this server")
+        if not channel.server.me.server_permissions.manage_roles:
+            if not silent:
+                await self.bot.say("I do not have permission to manage roles on this server")
             return False
         return True
 
@@ -888,33 +877,36 @@ class Gyms:
             role = await self.bot.create_role(server, name=role_name, mentionable=True)
         return role
 
-    async def subscribe(self, ctx, role_name):
-        if not await self.subscription_checks(ctx):
+    async def subscribe(self, channel, member, role_name, silent=False):
+        if not await self.subscription_checks(channel, silent):
             return
-        role = await self.get_or_create_role(ctx.message.channel.server, role_name)
-        await self.bot.add_roles(ctx.message.author, role)
-        await self.bot.say("I've subscribed you to notifications for {}".format(role_name))
+        role = await self.get_or_create_role(channel.server, role_name)
+        await self.bot.add_roles(member, role)
+        if not silent:
+            await self.bot.say("I've subscribed you to notifications for {}".format(role_name))
 
-    async def unsubscribe(self, ctx, role_name):
-        if not await self.subscription_checks(ctx):
+    async def unsubscribe(self, channel, member, role_name, silent=False):
+        if not await self.subscription_checks(channel, silent):
             return
-        role = await self.find_role(ctx.message.channel.server, role_name)
+        role = await self.find_role(channel.server, role_name)
         if role is None:
-            await self.bot.say("You are not subscribed to {}".format(role_name))
+            if not silent:
+                await self.bot.say("You are not subscribed to {}".format(role_name))
             return
-        await self.bot.remove_roles(ctx.message.author, role)
+        await self.bot.remove_roles(member, role)
         delete_role = True
-        await self.bot.request_offline_members(ctx.message.channel.server)
-        for member in ctx.message.channel.server.members:
-            for _role in member.roles:
-                if _role == role:
+        await self.bot.request_offline_members(channel.server)
+        for _member in channel.server.members:
+            for _role in _member.roles:
+                if _role == role and _member != member:
                     delete_role = False
                     break
             if delete_role is False:
                 break
         if delete_role:
-            await self.bot.delete_role(ctx.message.channel.server, role)
-        await self.bot.say("I've unsubscribed you to notifications for {}".format(role_name))
+            await self.bot.delete_role(channel.server, role)
+        if not silent:
+            await self.bot.say("I've unsubscribed you to notifications for {}".format(role_name))
 
     @commands.command(pass_context=True)
     async def raidsubscribe(self, ctx, *, gym_title: str):
@@ -925,7 +917,7 @@ class Gyms:
         if not gym:
             await self.bot.say("Gym not found.")
             return
-        await self.subscribe(ctx, gym.title)
+        await self.subscribe(ctx.message.channel, ctx.message.author, gym.title)
 
     @commands.command(pass_context=True)
     async def raidunsubscribe(self, ctx, *, gym_title: str):
@@ -936,7 +928,7 @@ class Gyms:
         if not gym:
             await self.bot.say("Gym not found.")
             return
-        await self.unsubscribe(ctx, gym.title)
+        await self.unsubscribe(ctx.message.channel, ctx.message.author, gym.title)
 
     @commands.command(pass_context=True)
     async def pokemonsubscribe(self, ctx, *, pokemon: str):
@@ -947,7 +939,7 @@ class Gyms:
         if not p:
             await self.bot.say("Pokemon not found.")
             return
-        await self.subscribe(ctx, p.name)
+        await self.subscribe(ctx.message.channel, ctx.message.author, p.name)
 
     @commands.command(pass_context=True)
     async def pokemonunsubscribe(self, ctx, *, pokemon: str):
@@ -958,7 +950,7 @@ class Gyms:
         if not p:
             await self.bot.say("Pokemon not found.")
             return
-        await self.unsubscribe(ctx, p.name)
+        await self.unsubscribe(ctx.message.channel, ctx.message.author, p.name)
 
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
@@ -1026,6 +1018,59 @@ class Gyms:
         if tasks:
             await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
+    async def mark_going(self, channel, member_setting, members, raid, extra=0):
+        if not isinstance(members, list):
+            members = [[members, extra]]
+
+        for member, extra in members:
+            try:
+                going = self.session.query(Going).filter_by(raid=raid, user_id=member.id).one()
+                return
+            except NoResultFound:
+                pass
+
+            await self.subscribe(channel, member, "Raid #{}".format(raid.id), True)
+            going = Going(raid=raid, user_id=member.id, extra=extra)
+            self.session.add(going)
+
+        await self.log(
+            channel.server,
+            "{} added {} as going to raid {}",
+            self.get_display_name(channel, member_setting),
+            ", ".join([self.get_display_name(channel, member, extra) for member, extra in members]),
+            raid.id
+        )
+
+        self.session.commit()        
+        await self.update_embeds(channel.server, raid)
+
+    async def mark_not_going(self, channel, member_setting, members, raid):
+        if not isinstance(members, list):
+            members = [members]
+
+        for member in members:
+            await self.unsubscribe(channel, member, "Raid #{}".format(raid.id), True)
+            try:
+                going = self.session.query(Going).filter_by(raid=raid, user_id=member.id).one()
+                self.session.query(Going).filter_by(raid=raid, user_id=member.id).delete()
+            except NoResultFound:
+                continue
+        await self.log(
+            channel.server,
+            "{} removed {} from raid {}",
+            self.get_display_name(channel, member_setting),
+            ", ".join([self.get_display_name(channel, member) for member in members]),
+            raid.id
+        )
+        await self.update_embeds(channel.server, raid)
+
+    async def toggle_going(self, channel, member_setting, member, raid):
+        try:
+            going = self.session.query(Going).filter_by(raid=raid, user_id=member.id).one()
+            await self.mark_not_going(channel, member_setting, member, raid)
+        except NoResultFound:
+            await self.mark_going(channel, member_setting, member, raid)
+
     async def on_raw_reaction(self, emoji, message_id, channel_id, user_id):
         channel = await self.get_channel(channel_id)
         message = await self.get_message(channel, message_id)
@@ -1058,17 +1103,7 @@ class Gyms:
                 await self.add_reactions(message)
 
             if emoji == emoji_going:
-                try:
-                    going = self.session.query(Going).filter_by(raid=embed.raid, user_id=user_id).one()
-                    self.session.query(Going).filter_by(raid=embed.raid, user_id=user_id).delete()
-                    await self.log(channel.server, "{} marked themself as not going to raid {}", member, embed.raid.id)
-                except NoResultFound:
-                    going = Going(raid=embed.raid, user_id=user_id, extra=0)
-                    self.session.add(going)
-                    await self.log(channel.server, "{} marked themself as going to raid {}", member, embed.raid.id)
-                self.session.commit()
-
-                await self.update_embeds(channel.server, embed.raid)
+                await self.toggle_going(channel, member, member, embed.raid)
             elif emoji in [emoji_plus1, emoji_minus1]:
                 try:
                     going = self.session.query(Going).filter_by(raid=embed.raid, user_id=user_id).one()
