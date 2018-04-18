@@ -456,9 +456,9 @@ class Gyms:
             channel = ctx.message.channel
 
         if value is None:
-            await self.bot.say("{} = {}".format(key, self.get_server_config(ctx.message.channel.server.id, key)))
+            await self.bot.say("{} = {}".format(key, self.get_server_config(channel.server.id, key)))
         else:
-            self.set_server_config(ctx.message.channel.server.id, key, value)
+            self.set_server_config(channel.server.id, key, value)
             await self.bot.say("Ok, {} = {}".format(key, value))
 
     @commands.command(pass_context=True)
@@ -480,7 +480,7 @@ class Gyms:
         if value is None:
             await self.bot.say("{} = {}".format(key, self.get_channel_config(channel.server.id, channel.id, key)))
         else:
-            self.set_channel_config(ctx.message.channel.server.id, ctx.message.channel.id, key, value)
+            self.set_channel_config(channel.server.id, channel.id, key, value)
             await self.bot.say("Ok, {} = {}".format(key, value))
 
     @commands.command(pass_context=True)
