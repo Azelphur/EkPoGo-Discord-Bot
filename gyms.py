@@ -211,7 +211,12 @@ class Gyms:
                 return e
         return emoji
 
-    async def get_display_name(self, channel, member, extra=0):
+    def get_display_name(self, channel, member, extra=0):
+        if member == None:
+            if extra > 0:
+                return "Unknown User (+{})".format(extra)
+            return "Unknown User"
+
         team_emoji = ''
         role_mystic = self.get_config(channel, "role_mystic")
         role_valor = self.get_config(channel, "role_valor")
@@ -260,13 +265,6 @@ class Gyms:
             return None
         return response[0]
 
-    async def get_member(self, server, user_id):
-        if user_id in self.member_cache:
-            return self.member_cache[user_id]
-        user = server.get_member(str(user_id))
-        self.member_cache[user_id] = user
-        return user
-
     async def get_channel(self, channel_id):
         if channel_id in self.channel_cache:
             return self.channel_cache[user_id]
@@ -282,27 +280,14 @@ class Gyms:
         title = "{} (#{})".format(raid.gym.title, raid.id)
         going = self.session.query(Going).filter_by(raid=raid)
 
-        async def get_member_with_extra(server, user_id, extra):
-            return await self.get_member(server, user_id), extra
-
         users = []
         num_extra = 0
         if going.count():
-            tasks = []
             for g in going:
                 num_extra += g.extra
-                tasks.append(get_member_with_extra(server, g.user_id, g.extra))
-            done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
-
-            tasks = []
-            for task in done:
-                result, extra = task.result()
-                tasks.append(self.get_display_name(channel, result, extra))
-            done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
-
-            for task in done:
-                result = task.result()
-                users.append(result)
+                member = server.get_member(str(g.user_id))
+                display_name = self.get_display_name(channel, member, g.extra)
+                users.append(display_name)
             users.sort()
 
         if raid.pokemon is None:
@@ -587,7 +572,7 @@ class Gyms:
 
         users = []
         for g in going:
-            member = await self.get_member(ctx.message.channel.server, g.user_id)
+            member = ctx.message.channel.server.get_member(str(g.user_id))
             users.append(member.mention)
         msg = "Go in! {}".format(", ".join(users))
         await self.bot.say(msg)
@@ -675,7 +660,7 @@ class Gyms:
                 continue
             match = RE_DISCORD_MENTION.match(args[i])
             if match:
-                member = await self.get_member(ctx.message.channel.server, match.group(1))
+                member = ctx.message.channel.server.get_member(match.group(1))
                 extra = 0
                 if i+1 < len(args) and args[i+1].isnumeric():
                     extra = int(args[i+1])
@@ -1044,7 +1029,7 @@ class Gyms:
     async def on_raw_reaction(self, emoji, message_id, channel_id, user_id):
         channel = await self.get_channel(channel_id)
         message = await self.get_message(channel, message_id)
-        member = await self.get_member(channel.server, user_id)
+        member = channel.server.get_member(user_id)
         emoji = self.get_emoji_by_name(emoji)
 
         if message.author == self.bot.user and user_id != self.bot.user.id:
