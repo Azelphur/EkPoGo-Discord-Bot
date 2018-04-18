@@ -705,7 +705,7 @@ class Gyms:
 
         cleaned_start_time = start_time.rstrip("m")
         cleaned_start_time = cleaned_start_time.rstrip("mins")
-        if cleaned_start_time.isnumeric():
+        if cleaned_start_time.isnumeric() and int(cleaned_start_time) <= 60:
             return datetime.datetime.now() + datetime.timedelta(minutes=int(cleaned_start_time))
 
         for t_format in ["%H:%M", "%H%M", "%H.%M"]:
