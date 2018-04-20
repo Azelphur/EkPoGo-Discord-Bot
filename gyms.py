@@ -1202,7 +1202,7 @@ class Gyms:
         for embed in embeds:
             embed_channel = await self.get_channel(embed.channel_id)
             if embed_channel is None:
-                self.session.query(Embed).filter_by(id=embed.id).delete()
+                #self.session.query(Embed).filter_by(id=embed.id).delete()
                 continue
             if self.get_config(embed_channel, "delete_on_done", "no") == "no":
                 continue
@@ -1213,6 +1213,7 @@ class Gyms:
             done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             for task in done:
                 task.result() # This will cause errors to be raised correctly.
+        self.session.add(raid)
         self.session.commit()
         await self.update_embeds(raid)
         if member:
