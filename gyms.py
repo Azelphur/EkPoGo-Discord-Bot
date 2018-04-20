@@ -237,7 +237,7 @@ class Gyms:
         return name
 
     async def raid_end_task(self, raid):
-        while raid.end_time + datetime.timedelta(minutes=1) > datetime.datetime.now():
+        while raid.end_time + datetime.timedelta(minutes=5) > datetime.datetime.now():
             await asyncio.sleep(5)
         raids = self.session.query(Raid).filter(Raid.done == False, Raid.end_time <= datetime.datetime.now())
         for raid in raids:
