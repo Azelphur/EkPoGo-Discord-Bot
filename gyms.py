@@ -18,6 +18,7 @@ from sqlalchemy import (
     create_engine, Column, Integer,
     String, DateTime, Float, ForeignKey, Boolean, UniqueConstraint)
 from sqlalchemy.orm import sessionmaker, relationship
+from asgiref.sync import async_to_sync
 
 Base = declarative_base()
 
@@ -152,7 +153,8 @@ class Gyms:
         self.session = sessionmaker(bind=engine)()
 
         self.member_cache = {}
-        self.channel_cache = {}
+        self.raid_task = None
+        self.reschedule_next_end()
 
     def get_server_config(self, server_id, key, default=None):
         try:
@@ -234,6 +236,23 @@ class Gyms:
             name = "{} (+{})".format(name, extra)
         return name
 
+    async def raid_end_task(self, raid):
+        while raid.end_time + datetime.timedelta(minutes=1) > datetime.datetime.now():
+            await asyncio.sleep(5)
+        raids = self.session.query(Raid).filter(Raid.done == False, Raid.end_time <= datetime.datetime.now())
+        for raid in raids:
+            await self.mark_done(raid)
+        self.reschedule_next_end(False)
+
+    def reschedule_next_end(self, cancel=True):
+        if self.raid_task is not None and cancel:
+            if self.raid_task.done():
+                self.raid_task.result()
+            self.raid_task.cancel()
+        raid = self.session.query(Raid).filter(Raid.done == False).order_by('end_time').first()
+        if raid:
+            self.raid_task = self.bot.loop.create_task(self.raid_end_task(raid))
+
     async def find_gym(self, gym, channel=None):
         location = self.get_config(channel, "location", [])
         if location != []:
@@ -265,8 +284,6 @@ class Gyms:
         return response[0]
 
     async def get_channel(self, channel_id):
-        if channel_id in self.channel_cache:
-            return self.channel_cache[user_id]
         return self.bot.get_channel(str(channel_id))
 
     def format_time(self, t):
@@ -305,7 +322,7 @@ class Gyms:
         description += "**Going ({})**\n".format(going.count()+num_extra)
 
         description += " | ".join(users)
-        description += "\nPress the {} below if you are going\n[Click here](https://github.com/Azelphur/EkPoGo-Discord-Bot/wiki/Using-the-bot) more info about this bot".format(self.get_emoji(self.get_config(channel, "emoji_going", u"\U0001F44D")))
+        description += "\nPress the {} below if you want to do this raid\n[Click here](https://github.com/Azelphur/EkPoGo-Discord-Bot/wiki/Using-the-bot) more info about this bot".format(self.get_emoji(self.get_config(channel, "emoji_going", u"\U0001F44D")))
         if raid.done:
             embed=discord.Embed(title=title, url="https://www.google.com/maps/dir/Current+Location/{},{}".format(raid.gym.latitude, raid.gym.longitude), description=description, color=0x00FF00)
         else:
@@ -502,7 +519,7 @@ class Gyms:
         self.session.add(raid)
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
-        await self.update_embeds(ctx.message.channel.server, raid)
+        await self.update_embeds(raid)
 
     @commands.command(pass_context=True)
     async def raidend(self, ctx, raid_id: int, *, end_time: str):
@@ -524,7 +541,8 @@ class Gyms:
         self.session.add(raid)
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
-        await self.update_embeds(ctx.message.channel.server, raid)
+        await self.update_embeds(raid)
+        self.reschedule_next_end()
 
     @commands.command(pass_context=True)
     async def raidpokemon(self, ctx, raid_id: int, *, pokemon_name: str):
@@ -554,7 +572,7 @@ class Gyms:
         self.session.add(raid)
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
-        await self.update_embeds(ctx.message.channel.server, raid)
+        await self.update_embeds(raid)
 
     @commands.command(pass_context=True)
     async def raidin(self, ctx, raid_id: int):
@@ -598,7 +616,7 @@ class Gyms:
         self.session.add(raid)
         self.session.commit()
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
-        await self.update_embeds(ctx.message.channel.server, raid)
+        await self.update_embeds(raid)
 
 
     @commands.command(pass_context=True)
@@ -779,6 +797,7 @@ class Gyms:
             if location is None:
                 continue
             scale = self.get_config(channel, "scale", "2")
+
             if geopy.distance.vincenty((gym.latitude, gym.longitude), location).km > int(scale):
                 continue
             channels_to_add_embed.add(channel)
@@ -802,6 +821,7 @@ class Gyms:
         for task in done:
             task.result() # This will cause errors to be raised correctly.
         self.session.commit()
+        self.reschedule_next_end()
         await self.log(ctx.message.channel.server, "{} created raid {}", ctx.message.author, raid.id)
 
 
@@ -1010,7 +1030,7 @@ class Gyms:
         message = await self.get_message(channel, embed.message_id)
         await self.bot.delete_message(message)
 
-    async def update_embeds(self, server, raid):
+    async def update_embeds(self, raid):
         embeds = self.session.query(Embed).filter_by(raid=raid)
         tasks = []
         for embed in embeds:
@@ -1042,7 +1062,7 @@ class Gyms:
         )
 
         self.session.commit()        
-        await self.update_embeds(channel.server, raid)
+        await self.update_embeds(raid)
 
     async def mark_not_going(self, channel, member_setting, members, raid):
         if not isinstance(members, list):
@@ -1062,7 +1082,7 @@ class Gyms:
             ", ".join([self.get_display_name(channel, member) for member in members]),
             raid.id
         )
-        await self.update_embeds(channel.server, raid)
+        await self.update_embeds(raid)
 
     async def toggle_going(self, channel, member_setting, member, raid):
         try:
@@ -1119,7 +1139,7 @@ class Gyms:
                     await self.log(channel.server, "{} removed a +1 (now {}) on raid {}", member, going.extra, embed.raid.id)
                 self.session.add(going)
                 self.session.commit()
-                await self.update_embeds(channel.server, embed.raid)
+                await self.update_embeds(embed.raid)
 
             elif emoji in [emoji_add_time, emoji_remove_time]:
                 raid = embed.raid
@@ -1130,31 +1150,18 @@ class Gyms:
                     raid.start_time -= datetime.timedelta(minutes=int(self.get_config(channel, "edit_time", 5)))
                 self.session.add(raid)
                 self.session.commit()
-                await self.update_embeds(channel.server, embed.raid)
+                await self.update_embeds(embed.raid)
                 await self.log(channel.server, "{} changed start on raid {} from {} to {}", member, raid.id, old_start_time, raid.start_time)
-            elif emoji == emoji_done:
+            elif emoji == emoji_done and self.check_permissions(channel, member, {"manage_messages": True}):
                 raid = embed.raid
-                raid.done = not raid.done
                 self.session.add(raid)
                 self.session.commit()
-                embeds = self.session.query(Embed).filter_by(raid=raid)
-                if raid.done:
-                    tasks = []
-                    for embed in embeds:
-                        embed_channel = await self.get_channel(embed.channel_id)
-                        if self.get_config(embed_channel, "delete_on_done", "no") == "no":
-                            continue
-                        self.session.query(Embed).filter_by(id=embed.id).delete()
-                        tasks.append(self.delete_message(embed))
-                    if tasks:
-                        self.session.commit()
-                        done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
-                        for task in done:
-                            task.result() # This will cause errors to be raised correctly.
-                    await self.update_embeds(channel.server, raid)
-                    await self.log(channel.server, "{} marked raid {} as done", member, raid.id)
+                if not raid.done:
+                    await self.mark_done(raid, member)
                 else:
-                    await self.update_embeds(channel.server, raid)
+                    raid.done = False
+                    embeds = self.session.query(Embed).filter_by(raid=raid)
+                    await self.update_embeds(raid)
                     tasks = []
                     configs = self.session.query(ChannelConfig).filter_by(server_id=channel.server.id, key="delete_on_done")
                     for config in configs:
@@ -1180,6 +1187,37 @@ class Gyms:
                             task.result() # This will cause errors to be raised correctly.
                     self.session.commit()
                     await self.log(channel.server, "{} marked raid {} not as done", member, raid.id)
+
+    def check_permissions(self, channel, author, perms):
+        if not perms:
+            return False
+
+        resolved = channel.permissions_for(author)
+        return all(getattr(resolved, name, None) == value for name, value in perms.items())
+
+    async def mark_done(self, raid, member=None):
+        raid.done = True
+        embeds = self.session.query(Embed).filter_by(raid=raid)
+        tasks = []
+        for embed in embeds:
+            embed_channel = await self.get_channel(embed.channel_id)
+            if embed_channel is None:
+                self.session.query(Embed).filter_by(id=embed.id).delete()
+                continue
+            if self.get_config(embed_channel, "delete_on_done", "no") == "no":
+                continue
+            self.session.query(Embed).filter_by(id=embed.id).delete()
+            tasks.append(self.delete_message(embed))
+        if tasks:
+            self.session.commit()
+            done, not_done = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            for task in done:
+                task.result() # This will cause errors to be raised correctly.
+        self.session.commit()
+        await self.update_embeds(raid)
+        if member:
+            await self.log(member.server, "{} marked raid {} as done", member, raid.id)
+
 
     async def on_raw_message_delete(self, channel_id, message_id):
         try:
