@@ -283,7 +283,7 @@ class Gyms:
             return None
         return response[0]
 
-    async def get_channel(self, channel_id):
+    def get_channel(self, channel_id):
         return self.bot.get_channel(str(channel_id))
 
     def format_time(self, t):
@@ -785,14 +785,14 @@ class Gyms:
         for config in configs:
             if str(config.channel_id) == this_channel:
                 continue
-            channel = await self.get_channel(config.channel_id)
+            channel = self.get_channel(config.channel_id)
             channels_to_add_embed.add(channel)
 
         configs = self.session.query(ChannelConfig).filter_by(server_id=ctx.message.channel.server.id, key="mirror_nearby", value="yes")
         for config in configs:
             if str(config.channel_id) == this_channel:
                 continue
-            channel = await self.get_channel(config.channel_id)
+            channel = self.get_channel(config.channel_id)
             location = self.get_config(channel, "location", None)
             if location is None:
                 continue
@@ -987,7 +987,7 @@ class Gyms:
                 if time.time() - last_time > 10:
                     await self.bot.edit_message(progress_msg, "Processing... {} / {}".format(i, count))
                     last_time = time.time()
-                channel = await self.get_channel(embed.channel_id)
+                channel = self.get_channel(embed.channel_id)
                 if channel is None:
                     self.session.query(Embed).filter_by(id=embed.id).delete()
                     continue
@@ -1020,13 +1020,13 @@ class Gyms:
         return message if message else await self.bot.get_message(channel, message_id)
 
     async def update_embed(self, embed, raid):
-        channel = await self.get_channel(embed.channel_id)
+        channel = self.get_channel(embed.channel_id)
         message = await self.get_message(channel, embed.message_id)
         discord_embed, content = await self.prepare_raid_embed(channel, raid)
         await self.bot.edit_message(message, embed=discord_embed)
 
     async def delete_message(self, embed):
-        channel = await self.get_channel(embed.channel_id)
+        channel = self.get_channel(embed.channel_id)
         message = await self.get_message(channel, embed.message_id)
         await self.bot.delete_message(message)
 
@@ -1092,7 +1092,7 @@ class Gyms:
             await self.mark_going(channel, member_setting, member, raid)
 
     async def on_raw_reaction(self, emoji, message_id, channel_id, user_id):
-        channel = await self.get_channel(channel_id)
+        channel = self.get_channel(channel_id)
         message = await self.get_message(channel, message_id)
         member = channel.server.get_member(user_id)
         emoji = self.get_emoji_by_name(emoji)
@@ -1166,7 +1166,7 @@ class Gyms:
                     configs = self.session.query(ChannelConfig).filter_by(server_id=channel.server.id, key="delete_on_done")
                     for config in configs:
                         ch = config.channel_id
-                        ch_obj = await self.get_channel(ch)
+                        ch_obj = self.get_channel(ch)
                         embed, content = await self.prepare_raid_embed(ch_obj, raid)
                         tasks.append(self.bot.send_message(
                             ch_obj,
@@ -1199,11 +1199,18 @@ class Gyms:
         raid.done = True
         embeds = self.session.query(Embed).filter_by(raid=raid)
         tasks = []
+        servers = []
         for embed in embeds:
-            embed_channel = await self.get_channel(embed.channel_id)
+            embed_channel = self.get_channel(embed.channel_id)
             if embed_channel is None:
                 #self.session.query(Embed).filter_by(id=embed.id).delete()
                 continue
+            channel = self.get_channel(embed.channel_id)
+            if channel.server not in servers:
+                servers.append(channel.server)
+                role = await self.find_role(channel.server, "Raid #{}".format(raid.id))
+                if role is not None:
+                    tasks.append(self.bot.delete_role(channel.server, role))
             if self.get_config(embed_channel, "delete_on_done", "no") == "no":
                 continue
             self.session.query(Embed).filter_by(id=embed.id).delete()
@@ -1232,7 +1239,7 @@ class Gyms:
             if embed.channel_id == int(channel_id) and embed.message_id == int(message_id):
                 continue
             try:
-                channel = await self.get_channel(embed.channel_id)
+                channel = self.get_channel(embed.channel_id)
                 message = await self.get_message(channel, embed.message_id)
                 await self.bot.delete_message(message)
             except discord.errors.NotFound:
@@ -1266,7 +1273,7 @@ class Gyms:
     async def log(self, server, message, *args):
         configs = self.session.query(ChannelConfig).filter_by(server_id=server.id, key="log", value="yes")
         for config in configs:
-            channel = await self.get_channel(config.channel_id)
+            channel = self.get_channel(config.channel_id)
             await self.bot.send_message(channel, content=message.format(*args))
         
 
