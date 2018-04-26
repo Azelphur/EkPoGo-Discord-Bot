@@ -773,6 +773,7 @@ class Gyms:
             Raid.end_time <= end_dt + HATCH_TIME + DESPAWN_TIME
         ).first()
         if existing_raid:
+            await self.bot.say("A raid on that gym is already ongoing.")
             await self._raidhide(ctx, existing_raid.id, ctx.message.channel)
             await self._raidmirror(ctx, existing_raid.id)
             return
