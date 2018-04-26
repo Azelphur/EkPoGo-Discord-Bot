@@ -765,6 +765,17 @@ class Gyms:
             level = pokemon.raid_level
 
         gym = self.session.query(Gym).get(gym.meta['id'])
+        spawn_time = end_dt - HATCH_TIME - DESPAWN_TIME
+        existing_raid = self.session.query(Raid).filter(
+            Raid.done == False,
+            Raid.gym == gym,
+            Raid.end_time >= spawn_time,
+            Raid.end_time <= end_dt + HATCH_TIME + DESPAWN_TIME
+        ).first()
+        if existing_raid:
+            await self._raidhide(ctx, existing_raid.id, ctx.message.channel)
+            await self._raidmirror(ctx, existing_raid.id)
+            return
         raid = Raid(
             pokemon=pokemon,
             gym=gym,
@@ -830,6 +841,9 @@ class Gyms:
         """
             Mirror a raid embed to this channel
         """
+        await self._raidmirror(ctx, raid_id)
+
+    async def _raidmirror(self, ctx, raid_id: int):
         raid = self.session.query(Raid).get(raid_id)
         if raid is None:
             await self.bot.say("Raid not found")
@@ -847,6 +861,9 @@ class Gyms:
         """
             Hide a raid embed from a channel
         """
+        await self._raidhide(ctx, raid_id, channel)
+
+    async def _raidhide(self, ctx, raid_id: int, channel: discord.Channel = None):
         raid = self.session.query(Raid).get(raid_id)
         if raid is None:
             await self.bot.say("Raid not found")
