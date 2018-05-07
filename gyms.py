@@ -263,7 +263,7 @@ class Gyms:
             s = Search(using=self.client, index="marker")
             q = query.Q(
                 "function_score",
-                query=query.Q("match", title={'query': gym, 'fuzziness': 2}),
+                query=query.Q("match", title={'query': gym, 'fuzziness': 1}),
                 functions=[
                     query.SF("gauss", location={"origin": {"lat": location[0], "lon": location[1]}, "scale": scale+"km"})
                 ]
