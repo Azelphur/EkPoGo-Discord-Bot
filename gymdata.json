@@ -399,7 +399,8 @@
         "type": "pokemon",
         "data": {
             "name": "Primeape",
-            "id": "057"
+            "id": "057",
+            "raid_level": 2
         }
     },
     {
@@ -434,7 +435,8 @@
         "type": "pokemon",
         "data": {
             "name": "Poliwrath",
-            "id": "062"
+            "id": "062",
+            "raid_level": 4
         }
     },
     {
@@ -749,14 +751,16 @@
         "type": "pokemon",
         "data": {
             "name": "Hitmonlee",
-            "id": "106"
+            "id": "106",
+            "raid_level": 3
         }
     },
     {
         "type": "pokemon",
         "data": {
             "name": "Hitmonchan",
-            "id": "107"
+            "id": "107",
+            "raid_level": 3
         }
     },
     {
@@ -1826,7 +1830,8 @@
         "type": "pokemon",
         "data": {
             "name": "Combusken",
-            "id": "256"
+            "id": "256",
+            "raid_level": 2
         }
     },
     {
@@ -2036,7 +2041,8 @@
         "type": "pokemon",
         "data": {
             "name": "Breloom",
-            "id": "286"
+            "id": "286",
+            "raid_level": 3
         }
     },
     {
