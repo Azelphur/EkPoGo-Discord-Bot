@@ -49,6 +49,7 @@ SETTINGS = [
 
 RE_DISCORD_MENTION = re.compile("\<@(?:\!|)(\d+)\>")
 RE_EMOJI = re.compile("\<\:(.+):(\d+)>")
+RE_MINUTESAFTER = re.compile("^(\d+)@(.+)$")
 
 TIME_STRING = "Invalid time specified, please use HH:MM, HHMM, HH.MM, Xm or \"YYYY-MM-DD HH:MM\""
 
@@ -707,6 +708,12 @@ class Gyms:
 
     async def parse_time(self, start_time):
         start_dt = None
+
+        match = RE_MINUTESAFTER.match(start_time)
+        if match:
+            start_time = await self.parse_time(match.group(2))
+            start_time += datetime.timedelta(minutes=int(match.group(1)))
+            return start_time
 
         cleaned_start_time = start_time.rstrip("m")
         cleaned_start_time = cleaned_start_time.rstrip("mins")
