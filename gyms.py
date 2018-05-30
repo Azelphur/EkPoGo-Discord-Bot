@@ -19,6 +19,8 @@ from sqlalchemy import (
     String, DateTime, Float, ForeignKey, Boolean, UniqueConstraint)
 from sqlalchemy.orm import sessionmaker, relationship
 from asgiref.sync import async_to_sync
+import pytz
+from pytz import timezone
 
 Base = declarative_base()
 
@@ -45,6 +47,7 @@ SETTINGS = [
     "role_instinct",
     "enable_subscriptions",
     "log",
+    "timezone",
 ]
 
 RE_DISCORD_MENTION = re.compile("\<@(?:\!|)(\d+)\>")
@@ -238,9 +241,9 @@ class Gyms:
         return name
 
     async def raid_end_task(self, raid):
-        while raid.end_time + datetime.timedelta(minutes=5) > datetime.datetime.now():
+        while raid.end_time + datetime.timedelta(minutes=5) > datetime.datetime.utcnow():
             await asyncio.sleep(5)
-        raids = self.session.query(Raid).filter(Raid.done == False, Raid.end_time <= datetime.datetime.now())
+        raids = self.session.query(Raid).filter(Raid.done == False, Raid.end_time <= datetime.datetime.utcnow())
         for raid in raids:
             await self.mark_done(raid)
         self.reschedule_next_end(False)
@@ -287,10 +290,12 @@ class Gyms:
     def get_channel(self, channel_id):
         return self.bot.get_channel(str(channel_id))
 
-    def format_time(self, t):
-        if t - datetime.datetime.now() > datetime.timedelta(days=1):
-            return t.strftime("%Y-%m-%d %H:%M")
-        return t.strftime("%H:%M")
+    def format_time(self, channel, t):
+        tz = timezone(self.get_config(channel, "timezone", u"Europe/London"))
+        loc_dt = pytz.utc.localize(t).astimezone(tz)
+        if t - datetime.datetime.utcnow() > datetime.timedelta(days=1):
+            return loc_dt.strftime("%Y-%m-%d %H:%M")
+        return loc_dt.strftime("%H:%M")
 
     async def prepare_raid_embed(self, channel, raid, include_role=False):
         server = channel.server
@@ -316,10 +321,10 @@ class Gyms:
                 description = "**Pokemon**: {} (Level {})\n".format(raid.pokemon.name, raid.pokemon.raid_level)
             else:
                 description = "**Pokemon**: {}\n".format(raid.pokemon.name, raid.pokemon.raid_level)
-        description += "**Start Time**: {}\n".format(self.format_time(raid.start_time))
-        if datetime.datetime.now() < raid.end_time - DESPAWN_TIME:
-            description += "**Hatches at**: {}\n".format(self.format_time(raid.end_time - DESPAWN_TIME))
-        description += "**Despawns at**: {}\n".format(self.format_time(raid.end_time))
+        description += "**Start Time**: {}\n".format(self.format_time(channel, raid.start_time))
+        if datetime.datetime.utcnow() < raid.end_time - DESPAWN_TIME:
+            description += "**Hatches at**: {}\n".format(self.format_time(channel, raid.end_time - DESPAWN_TIME))
+        description += "**Despawns at**: {}\n".format(self.format_time(channel, raid.end_time))
         description += "**Going ({})**\n".format(going.count()+num_extra)
 
         description += " | ".join(users)
@@ -511,7 +516,7 @@ class Gyms:
             await self.bot.say("Raid not found")
             return
         start_time = start_time.replace('"', '')
-        start_dt = await self.parse_time(start_time)
+        start_dt = await self.parse_time(ctx, start_time)
         if start_dt is None:
             await self.bot.say(TIME_STRING)
             return
@@ -533,7 +538,7 @@ class Gyms:
             await self.bot.say("Raid not found")
             return
         end_time = end_time.replace('"', '')
-        end_dt = await self.parse_time(end_time)
+        end_dt = await self.parse_time(ctx, end_time)
         if end_dt is None:
             await self.bot.say(TIME_STRING)
             return
@@ -706,24 +711,27 @@ class Gyms:
 
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
 
-    async def parse_time(self, start_time):
+    async def parse_time(self, ctx, start_time):
         start_dt = None
 
         match = RE_MINUTESAFTER.match(start_time)
         if match:
-            start_time = await self.parse_time(match.group(2))
+            start_time = await self.parse_time(ctx, match.group(2))
             start_time += datetime.timedelta(minutes=int(match.group(1)))
             return start_time
 
         cleaned_start_time = start_time.rstrip("m")
         cleaned_start_time = cleaned_start_time.rstrip("mins")
         if cleaned_start_time.isnumeric() and int(cleaned_start_time) <= 60:
-            return datetime.datetime.now() + datetime.timedelta(minutes=int(cleaned_start_time))
+            return datetime.datetime.utcnow() + datetime.timedelta(minutes=int(cleaned_start_time))
 
         for t_format in ["%H:%M", "%H%M", "%H.%M"]:
             try:
-                now = datetime.datetime.now()
+                now = datetime.datetime.utcnow()
+                tz = timezone(self.get_config(ctx.message.channel, "timezone", u"Europe/London"))
+                now = tz.localize(now)
                 start_dt = datetime.datetime.strptime(start_time, t_format)
+                start_dt = tz.localize(start_dt)
                 start_dt = start_dt.replace(
                     year=now.year,
                     month=now.month,
@@ -748,7 +756,7 @@ class Gyms:
             await self.bot.say("Gym not found.")
             return
 
-        end_dt = await self.parse_time(end_time)
+        end_dt = await self.parse_time(ctx, end_time)
 
         if not end_dt:
             await self.bot.say(TIME_STRING)
@@ -763,7 +771,7 @@ class Gyms:
             if not pokemon:
                 await self.bot.say("Pokemon not found.")
                 return
-            start_dt = datetime.datetime.now() + datetime.timedelta(minutes=10)
+            start_dt = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
             if start_dt > end_dt: # Have we selected a start time after the raid ends? fix it
                 start_dt = end_dt - datetime.timedelta(minutes=2)
             if start_dt < end_dt - DESPAWN_TIME: # Have we selected a start time before the raid hatches? fix it
@@ -1000,7 +1008,7 @@ class Gyms:
     @commands.command(pass_context=True)
     @checks.serverowner_or_permissions(administrator=True)
     async def redo_reactions(self, ctx):
-        from_time = datetime.datetime.now() - datetime.timedelta(days=14)
+        from_time = datetime.datetime.utcnow() - datetime.timedelta(days=14)
         raids = self.session.query(Raid).filter(Raid.start_time >= from_time)
         count = raids.count()
         progress_msg = await self.bot.say("Processing... 0 / {}".format(count))
