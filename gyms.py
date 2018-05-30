@@ -731,14 +731,13 @@ class Gyms:
                 tz = timezone(self.get_config(ctx.message.channel, "timezone", u"Europe/London"))
                 now = tz.localize(now)
                 start_dt = datetime.datetime.strptime(start_time, t_format)
-                start_dt = tz.localize(start_dt)
-                start_dt = start_dt.replace(
-                    year=now.year,
-                    month=now.month,
-                    day=now.day,
+                start_dt = now.replace(
+                    hour=start_dt.hour,
+                    minute=start_dt.minute
                 )
                 if start_dt < now:
                     start_dt = start_dt + datetime.timedelta(days=1)
+                start_dt = start_dt.astimezone(pytz.utc)
             except ValueError:
                 pass
 
@@ -746,7 +745,6 @@ class Gyms:
             start_dt = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M")
         except ValueError:
             pass
-
         return start_dt
 
 
