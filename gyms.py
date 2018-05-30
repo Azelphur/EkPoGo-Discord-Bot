@@ -299,7 +299,8 @@ class Gyms:
 
     async def prepare_raid_embed(self, channel, raid, include_role=False):
         server = channel.server
-        title = "{} (#{})".format(raid.gym.title, raid.id)
+        title = gym.title if isinstance(gym.title, str) else gym.title[0]
+        title = "{} (#{})".format(title, raid.id)
         going = self.session.query(Going).filter_by(raid=raid)
 
         users = []
@@ -350,8 +351,9 @@ class Gyms:
         return embed, content
 
     def prepare_gym_embed(self, gym):
+        title = gym.title if isinstance(gym.title, str) else gym.title[0]
         description = "[Get Directions](https://www.google.com/maps/dir/Current+Location/{},{})".format(gym.location['lat'], gym.location['lon'])
-        embed=discord.Embed(title=gym.title, url="https://www.google.com/maps/dir/Current+Location/{},{}".format(gym.location['lat'], gym.location['lon']))
+        embed=discord.Embed(title=title, url="https://www.google.com/maps/dir/Current+Location/{},{}".format(gym.location['lat'], gym.location['lon']))
         embed.set_image(url='https://maps.googleapis.com/maps/api/staticmap?center={0},{1}&zoom=15&size=250x125&maptype=roadmap&markers=color:{3}%7C{0},{1}&key={2}'.format(gym.location['lat'], gym.location['lon'], 'AIzaSyCEadifeA8X02v2OKv-orZWm8nQf1Q2EZ4', 'red'))
         embed.set_footer(text="Gym ID {}.".format(gym.meta["id"]))
         return embed
@@ -438,6 +440,38 @@ class Gyms:
                 await self.bot.say("Imported {} gyms and {} pokemon".format(count_gyms, count_pokemon))
         except FileNotFoundError:
             await self.bot.say("File not found")
+
+    @commands.command(pass_context=True)
+    @checks.is_owner()
+    async def gymalias(self, ctx, gym_id: int, *, alias: str):
+        """
+            Add an alias for a gym
+        """
+        try:
+            gym = GymDoc.get(id=gym_id)
+        except elasticsearch.exceptions.NotFoundError:
+            await self.bot.say("Gym not found")
+        if isinstance(gym.title, str):
+            gym.title = [gym.title, alias]
+        else:
+            gym.title.append(alias)
+        gym.save()
+        await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
+
+    @commands.command(pass_context=True)
+    @checks.is_owner()
+    async def gymrmalias(self, ctx, gym_id: int, *, alias: str):
+        """
+            Remove an alias for a gym
+        """
+        try:
+            gym = GymDoc.get(id=gym_id)
+        except elasticsearch.exceptions.NotFoundError:
+            await self.bot.say("Gym not found")
+        if not isinstance(gym.title, str):
+            gym.title.remove(alias)
+            gym.save()
+        await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
 
     @commands.command(pass_context=True)
     @checks.is_owner()
