@@ -711,6 +711,23 @@ class Gyms:
 
         await self.add_reaction(ctx.message, self.get_config(ctx.message.channel, "emoji_command", u"\U0001F44D"))
 
+    def hours_minutes_to_dt(self, ctx, start_time, fmt):
+        try:
+            tz = timezone(self.get_config(ctx.message.channel, "timezone", u"Europe/London"))
+            now = datetime.datetime.utcnow().astimezone(tz)
+            start_dt = tz.localize(datetime.datetime.strptime(start_time, fmt))
+            start_dt = now.replace(
+                hour=start_dt.hour,
+                minute=start_dt.minute,
+                second=0
+            )
+            if start_dt < now:
+                start_dt = start_dt + datetime.timedelta(days=1)
+            start_dt = start_dt.astimezone(pytz.utc)
+            return start_dt
+        except ValueError:
+            return None
+
     async def parse_time(self, ctx, start_time):
         start_dt = None
 
@@ -725,22 +742,12 @@ class Gyms:
         if cleaned_start_time.isnumeric() and int(cleaned_start_time) <= 60:
             return datetime.datetime.utcnow() + datetime.timedelta(minutes=int(cleaned_start_time))
 
-        for t_format in ["%H:%M", "%H%M", "%H.%M"]:
-            try:
-                now = datetime.datetime.utcnow()
-                tz = timezone(self.get_config(ctx.message.channel, "timezone", u"Europe/London"))
-                now = tz.localize(now)
-                start_dt = datetime.datetime.strptime(start_time, t_format)
-                start_dt = now.replace(
-                    hour=start_dt.hour,
-                    minute=start_dt.minute
-                )
-                if start_dt < now:
-                    start_dt = start_dt + datetime.timedelta(days=1)
-                start_dt = start_dt.astimezone(pytz.utc)
-            except ValueError:
-                pass
-
+        for t_format_24h, t_format_12h in [("%H:%M", "%I:%M%p"), ("%H%M", "%I%M%p"), ("%H.%M", "%I.%M:%p")]:
+            start_dt = self.hours_minutes_to_dt(ctx, start_time, t_format_24h)
+            if start_dt - datetime.datetime.utcnow().astimezone(pytz.utc) > HATCH_TIME + DESPAWN_TIME:
+                start_dt = self.hours_minutes_to_dt(ctx, start_time+"pm", t_format_12h)
+            if start_dt is not None:
+                return start_dt
         try:
             start_dt = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M")
         except ValueError:
