@@ -299,7 +299,7 @@ class Gyms:
 
     async def prepare_raid_embed(self, channel, raid, include_role=False):
         server = channel.server
-        title = gym.title if isinstance(raid.gym.title, str) else raid.gym.title[0]
+        title = raid.gym.title if isinstance(raid.gym.title, str) else raid.gym.title[0]
         title = "{} (#{})".format(title, raid.id)
         going = self.session.query(Going).filter_by(raid=raid)
 
