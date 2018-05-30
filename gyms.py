@@ -744,6 +744,8 @@ class Gyms:
 
         for t_format_24h, t_format_12h in [("%H:%M", "%I:%M%p"), ("%H%M", "%I%M%p"), ("%H.%M", "%I.%M:%p")]:
             start_dt = self.hours_minutes_to_dt(ctx, start_time, t_format_24h)
+            if start_dt is None:
+                continue
             if start_dt - datetime.datetime.utcnow().astimezone(pytz.utc) > HATCH_TIME + DESPAWN_TIME:
                 start_dt = self.hours_minutes_to_dt(ctx, start_time+"pm", t_format_12h)
             if start_dt is not None:
