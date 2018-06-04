@@ -786,7 +786,12 @@ class Gyms:
             if start_dt is not None:
                 return start_dt
         try:
+            tz = timezone(self.get_config(ctx.message.channel, "timezone", u"Europe/London"))
             start_dt = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M")
+            start_dt = tz.localize(start_dt)
+            print("start_dt is", start_dt)
+            start_dt = start_dt.astimezone(pytz.utc)
+            print("converted to UTC", start_dt)
         except ValueError:
             pass
         return start_dt
@@ -813,7 +818,7 @@ class Gyms:
             if not pokemon:
                 await self.bot.say("Pokemon not found.")
                 return
-            start_dt = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+            start_dt = pytz.utc.localize(datetime.datetime.utcnow()) + datetime.timedelta(minutes=10)
             if start_dt > end_dt: # Have we selected a start time after the raid ends? fix it
                 start_dt = end_dt - datetime.timedelta(minutes=2)
             if start_dt < end_dt - DESPAWN_TIME: # Have we selected a start time before the raid hatches? fix it
