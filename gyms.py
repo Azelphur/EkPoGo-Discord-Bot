@@ -780,8 +780,9 @@ class Gyms:
             start_dt = self.hours_minutes_to_dt(ctx, start_time, t_format_24h)
             if start_dt is None:
                 continue
-            if start_dt - datetime.datetime.utcnow().astimezone(pytz.utc) > HATCH_TIME + DESPAWN_TIME:
-                start_dt = self.hours_minutes_to_dt(ctx, start_time+"pm", t_format_12h)
+            if start_dt - pytz.utc.localize(datetime.datetime.utcnow()) > HATCH_TIME + DESPAWN_TIME:
+                new_start_dt = self.hours_minutes_to_dt(ctx, start_time+"pm", t_format_12h)
+                start_dt = start_dt if new_start_dt is None else new_start_dt
             if start_dt is not None:
                 return start_dt
         try:
