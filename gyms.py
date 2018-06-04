@@ -774,7 +774,7 @@ class Gyms:
         cleaned_start_time = start_time.rstrip("m")
         cleaned_start_time = cleaned_start_time.rstrip("mins")
         if cleaned_start_time.isnumeric() and int(cleaned_start_time) <= 60:
-            return datetime.datetime.utcnow() + datetime.timedelta(minutes=int(cleaned_start_time))
+            return datetime.datetime.utcnow().replace(tzinfo=pytz.utc) + datetime.timedelta(minutes=int(cleaned_start_time))
 
         for t_format_24h, t_format_12h in [("%H:%M", "%I:%M%p"), ("%H%M", "%I%M%p"), ("%H.%M", "%I.%M:%p")]:
             start_dt = self.hours_minutes_to_dt(ctx, start_time, t_format_24h)
